@@ -1,12 +1,14 @@
 import { fileURLToPath } from "node:url";
+import { styleText } from "node:util";
 import { resolve } from "node:path";
 import {
   defineTool,
+  SettingsManager,
   type ExtensionAPI,
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { matchesKey } from "@earendil-works/pi-tui";
-import { truncateToWidth } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
   BOUNDARY_TYPE,
@@ -23,6 +25,7 @@ import {
   validateShell,
 } from "./core.ts";
 import {
+  agentDir,
   editArchivedPlan,
   ensurePlanArchive,
   isArchivePath,
@@ -55,12 +58,73 @@ const READY_OPTIONS: Array<{ label: string; intent: ReadyIntent }> = [
   { label: "Exit / discard", intent: "discard" },
 ];
 
+function paintBackground(line: string, background: string): string {
+  if (!background) return line;
+  return `${background}${line.replaceAll("\x1b[0m", `\x1b[0m${background}`)}\x1b[49m`;
+}
+
+function paintPlanLine(line: string, width: number, background: string): string {
+  const truncated = truncateToWidth(line, width);
+  return paintBackground(
+    `${truncated}${" ".repeat(Math.max(0, width - visibleWidth(truncated)))}`,
+    background,
+  );
+}
+
+async function showPlanSelect(
+  ctx: ExtensionContext,
+  title: string,
+  options: readonly string[],
+): Promise<string | undefined> {
+  if (ctx.mode !== "tui") return undefined;
+  const background = ctx.ui.theme.getBgAnsi("userMessageBg");
+  return ctx.ui.custom<string | undefined>((tui, _theme, _keybindings, done) => {
+    let selected = 0;
+    return {
+      handleInput(data: string) {
+        if (matchesKey(data, "escape") || matchesKey(data, "ctrl+c")) done(undefined);
+        else if (matchesKey(data, "return")) done(options[selected]);
+        else if (matchesKey(data, "up")) {
+          selected = (selected + options.length - 1) % options.length;
+          tui.requestRender();
+        } else if (matchesKey(data, "down")) {
+          selected = (selected + 1) % options.length;
+          tui.requestRender();
+        }
+      },
+      invalidate() {},
+      render(width: number) {
+        const inset = "  ";
+        const divider = styleText(["cyan", "dim"], "─".repeat(Math.max(1, width - 4)));
+        const lines = [
+          "",
+          `${inset}${styleText(["cyan", "bold"], title)}`,
+          `${inset}${divider}`,
+          "",
+        ];
+        for (let index = 0; index < options.length; index += 1) {
+          const prefix = index === selected ? "› " : "  ";
+          lines.push(`${inset}${styleText("cyan", `${prefix}${options[index]}`)}`);
+        }
+        lines.push(
+          "",
+          `${inset}${divider}`,
+          `${inset}${styleText(["cyan", "dim"], "↑↓ navigate  enter select  escape/ctrl+c cancel")}`,
+          "",
+        );
+        return lines.map((line) => paintPlanLine(line, width, background));
+      },
+    };
+  });
+}
+
 async function showReadyMenu(
   ctx: ExtensionContext,
   archivePath: string,
 ): Promise<ReadyIntent | undefined> {
   if (ctx.mode !== "tui") return undefined;
-  return ctx.ui.custom<ReadyIntent>((tui, theme, _keybindings, done) => {
+  const background = ctx.ui.theme.getBgAnsi("userMessageBg");
+  return ctx.ui.custom<ReadyIntent>((tui, _theme, _keybindings, done) => {
     let selected = 0;
     return {
       handleInput(data: string) {
@@ -78,21 +142,26 @@ async function showReadyMenu(
       },
       invalidate() {},
       render(width: number) {
-        const lines = [theme.fg("accent", theme.bold("Plan ready")), ""];
+        const inset = "  ";
+        const divider = styleText(["cyan", "dim"], "─".repeat(Math.max(1, width - 4)));
+        const lines = [
+          "",
+          `${inset}${styleText(["cyan", "bold"], "Plan ready")}`,
+          `${inset}${divider}`,
+          "",
+        ];
         for (let index = 0; index < READY_OPTIONS.length; index += 1) {
-          const prefix = index === selected ? theme.fg("accent", "› ") : "  ";
-          const label = theme.fg(
-            index === selected ? "accent" : "text",
-            READY_OPTIONS[index].label,
-          );
-          lines.push(truncateToWidth(`${prefix}${label}`, width));
+          const prefix = index === selected ? "› " : "  ";
+          lines.push(`${inset}${styleText("cyan", `${prefix}${READY_OPTIONS[index].label}`)}`);
         }
         lines.push(
           "",
-          truncateToWidth(theme.fg("muted", "Ctrl+E edit archive · Esc keep planning"), width),
+          `${inset}${divider}`,
+          `${inset}${styleText(["cyan", "dim"], "Ctrl+E edit archive · Esc keep planning")}`,
+          `${inset}${styleText(["cyan", "dim"], archivePath)}`,
+          "",
         );
-        lines.push(truncateToWidth(theme.fg("dim", archivePath), width));
-        return lines;
+        return lines.map((line) => paintPlanLine(line, width, background));
       },
     };
   });
@@ -130,6 +199,19 @@ export default function piPlan(pi: ExtensionAPI): void {
     return slash > 0 ? ctx.modelRegistry.find(id.slice(0, slash), id.slice(slash + 1)) : undefined;
   }
 
+  function enabledPlanningModels(ctx: ExtensionContext) {
+    const enabled = SettingsManager.create(ctx.cwd, agentDir(), {
+      projectTrusted: ctx.isProjectTrusted(),
+    }).getEnabledModels();
+    const available = ctx.modelRegistry
+      .getAvailable()
+      .filter((model) => ctx.modelRegistry.hasConfiguredAuth(model));
+    if (!enabled) return available;
+    return available.filter(
+      (model) => enabled.includes(model.id) || enabled.includes(`${model.provider}/${model.id}`),
+    );
+  }
+
   function isOwnInternalTool(tool: ReturnType<typeof pi.getAllTools>[number]): boolean {
     if (!INTERNAL_TOOLS.includes(tool.name)) return false;
     const path = tool.sourceInfo.path;
@@ -163,7 +245,11 @@ export default function piPlan(pi: ExtensionAPI): void {
     const cycle = state.cycle;
     const configured =
       cycle.planningModel === "inherit" ? undefined : findModel(ctx, cycle.planningModel);
-    const configuredAvailable = configured && ctx.modelRegistry.hasConfiguredAuth(configured);
+    const configuredAvailable =
+      configured &&
+      enabledPlanningModels(ctx).some(
+        (model) => model.provider === configured.provider && model.id === configured.id,
+      );
     const fallback = findModel(ctx, cycle.previousModel);
     const fallbackAvailable = fallback && ctx.modelRegistry.hasConfiguredAuth(fallback);
     const selected = configuredAvailable ? configured : fallbackAvailable ? fallback : undefined;
@@ -223,14 +309,11 @@ export default function piPlan(pi: ExtensionAPI): void {
     if (state.phase === "off") return;
     const models = [
       "Inherit current model",
-      ...ctx.modelRegistry
-        .getAvailable()
-        .filter((model) => ctx.modelRegistry.hasConfiguredAuth(model))
-        .map((model) => `${model.provider}/${model.id}`),
+      ...enabledPlanningModels(ctx).map((model) => `${model.provider}/${model.id}`),
     ];
-    const selectedModel = await ctx.ui.select("Planning model", models);
+    const selectedModel = await showPlanSelect(ctx, "Planning model", models);
     if (!selectedModel) return;
-    const selectedThinking = await ctx.ui.select("Planning thinking effort", [...THINKING_LEVELS]);
+    const selectedThinking = await showPlanSelect(ctx, "Planning thinking effort", THINKING_LEVELS);
     if (!selectedThinking) return;
     const next: Preferences = {
       model: selectedModel === models[0] ? "inherit" : selectedModel,
@@ -250,7 +333,7 @@ export default function piPlan(pi: ExtensionAPI): void {
 
   async function planningMenu(ctx: ExtensionContext): Promise<void> {
     while (state.phase === "planning") {
-      const action = await ctx.ui.select("Plan mode", [
+      const action = await showPlanSelect(ctx, "Plan mode", [
         "Planning options",
         "Keep planning",
         "Exit / discard",

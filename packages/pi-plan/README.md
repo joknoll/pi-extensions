@@ -23,7 +23,7 @@ Shift+Tab must be available to the extension. Move `app.thinking.cycle` to anoth
 
 ## Workflow
 
-- Press **Shift+Tab** to enter Plan mode. Existing editor text is preserved and the footer shows `plan active`.
+- Press **Shift+Tab** to enter Plan mode. Existing editor text is preserved and the footer shows `plan`.
 - Discuss the work while the model inspects the repository with read-only tools.
 - While idle, press **Shift+Tab** again for planning model/effort options or to exit.
 - The model submits a structured completion; the footer shows `plan ready` and an action menu appears.
@@ -31,7 +31,7 @@ Shift+Tab must be available to the extension. Move `app.thinking.cycle` to anoth
 - While a plan is ready, press **Ctrl+E** in the menu or while idle to edit its archived Markdown file in Pi's configured external editor.
 - A following message after Keep planning uses the current plan as a revision baseline and requires a complete replacement.
 
-Planning options include inherited settings, authenticated models, and efforts from `off` through `max`. Pi may clamp effort to model capabilities. The entry model, effort, and exact available tool set are restored on implementation or exit.
+Planning options include inherited settings, models allowed by Pi's `enabledModels` setting, and efforts from `off` through `max`. Add each planning model as its model ID (or `provider/model` ID) in Pi's configuration. Pi may clamp effort to model capabilities. The entry model, effort, and exact available tool set are restored on implementation or exit.
 
 Global defaults live at `$PI_CODING_AGENT_DIR/pi-plan.json` (normally `~/.pi/agent/pi-plan.json`):
 
@@ -52,7 +52,7 @@ Plan mode exposes only effective built-in inspection tools, a fail-closed restri
 
 The clear-context implementation action writes a unique durable boundary and filters earlier conversation from subsequent model context. The visible session remains intact, and normal system/project instructions and tools remain available.
 
-The footer reports `plan active` and `plan ready`. Ctrl+E is intercepted only while an archived plan is ready and Pi is idle; Pi's normal external prompt editor remains untouched at all other times. Invalid or failed archive edits restore the previous plan.
+The footer reports `plan` and `plan ready`. Ctrl+E is intercepted only while an archived plan is ready and Pi is idle; Pi's normal external prompt editor remains untouched at all other times. Invalid or failed archive edits restore the previous plan.
 
 ## Development
 
