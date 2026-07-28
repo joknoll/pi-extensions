@@ -1,7 +1,7 @@
 {
-  "name": "pi-extensions",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@joknoll/pi-extensions",
+  "version": "0.1.0",
+  "private": false,
   "type": "module",
   "scripts": {
     "ready": "vp check && vp run -r test && vp run -r build",
