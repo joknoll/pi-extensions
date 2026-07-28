@@ -56,11 +56,10 @@ export default function piFooter(pi: ExtensionAPI): void {
           theme.fg("dim", `↑${formatTokens(input)}/↓${formatTokens(output)}`),
           contextText && theme.fg("dim", contextText),
         ].filter(Boolean);
-        const modelText = ctx.model
-          ? `\x1b[38;2;255;245;157m${model}\x1b[39m`
-          : theme.fg("dim", model);
+        const modelText = ctx.model ? theme.bold(theme.fg("text", model)) : theme.fg("dim", model);
         const statuses = footerData.getExtensionStatuses();
-        const planMode = statuses.get("plan-mode");
+        const planModeStatus = statuses.get("plan-mode");
+        const planMode = planModeStatus ? theme.fg("accent", planModeStatus) : undefined;
         const cache = statuses.get("pi-cache");
         const right = [planMode, modelText, thinkingText, cache, ...stats]
           .filter(Boolean)

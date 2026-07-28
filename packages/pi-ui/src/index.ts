@@ -1,13 +1,14 @@
 import { CustomEditor, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export function paintBackground(line: string, background: string): string {
+  if (!background) return line;
   return `${background}${line.replaceAll("\x1b[0m", `\x1b[0m${background}`)}\x1b[49m`;
 }
 
 class PiEditor extends CustomEditor {
   bashBorderColor?: (text: string) => string;
-  // Pi has no editor-background token; session_start replaces this fallback.
-  background = "\x1b[48;2;58;58;58m";
+  // session_start supplies the active theme's user-message background.
+  background = "";
 
   render(width: number): string[] {
     const prompt = this.borderColor("x") === this.bashBorderColor?.("x") ? "$ " : "❯ ";
