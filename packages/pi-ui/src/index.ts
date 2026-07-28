@@ -6,7 +6,7 @@ export function paintBackground(line: string, background: string): string {
 
 class PiEditor extends CustomEditor {
   bashBorderColor?: (text: string) => string;
-  // ponytail: Pi has no editor-background token; session_start replaces this fallback.
+  // Pi has no editor-background token; session_start replaces this fallback.
   background = "\x1b[48;2;58;58;58m";
 
   render(width: number): string[] {
