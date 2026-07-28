@@ -1,5 +1,6 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { styleText } from "node:util";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 export const formatTokens = (tokens: number): string =>
@@ -56,7 +57,7 @@ export default function piFooter(pi: ExtensionAPI): void {
           theme.fg("dim", `↑${formatTokens(input)}/↓${formatTokens(output)}`),
           contextText && theme.fg("dim", contextText),
         ].filter(Boolean);
-        const modelText = ctx.model ? theme.bold(theme.fg("text", model)) : theme.fg("dim", model);
+        const modelText = ctx.model ? styleText("yellowBright", model) : theme.fg("dim", model);
         const statuses = footerData.getExtensionStatuses();
         const planModeStatus = statuses.get("plan-mode");
         const planMode = planModeStatus ? theme.fg("accent", planModeStatus) : undefined;
