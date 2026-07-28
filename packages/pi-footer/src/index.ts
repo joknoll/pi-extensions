@@ -60,7 +60,7 @@ export default function piFooter(pi: ExtensionAPI): void {
         const modelText = ctx.model ? styleText("yellowBright", model) : theme.fg("dim", model);
         const statuses = footerData.getExtensionStatuses();
         const planModeStatus = statuses.get("plan-mode");
-        const planMode = planModeStatus ? theme.fg("accent", planModeStatus) : undefined;
+        const planMode = planModeStatus ? styleText("cyan", planModeStatus) : undefined;
         const cache = statuses.get("pi-cache");
         const right = [planMode, modelText, thinkingText, cache, ...stats]
           .filter(Boolean)
