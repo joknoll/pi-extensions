@@ -1,6 +1,6 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { styleText } from "node:util";
+import { stripVTControlCharacters, styleText } from "node:util";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 export const formatTokens = (tokens: number): string =>
@@ -16,8 +16,12 @@ export default function piFooter(pi: ExtensionAPI): void {
         { timeout: 2_000 },
       );
       if (result.code === 0 && result.stdout.trim()) {
-        // A footer is a single line; preserve Starship's styling but flatten its prompt lines.
-        directory = result.stdout.trim().replace(/\s*\n\s*/g, " ");
+        // Preserve Starship's styling, but omit its input prompt and empty lines.
+        directory = result.stdout
+          .split(/\r?\n/)
+          .map((line) => line.replaceAll("❯", "").trim())
+          .filter((line) => stripVTControlCharacters(line).trim())
+          .join(" ");
       }
     } catch {
       // Starship is optional; use the working directory if it cannot be run.
