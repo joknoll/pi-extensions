@@ -1,17 +1,14 @@
 {
   "name": "@joknoll/pi-rtk",
   "version": "0.0.0",
-  "description": "A starter for creating a TypeScript package.",
-  "homepage": "https://github.com/author/library#readme",
-  "bugs": {
-    "url": "https://github.com/author/library/issues"
-  },
+  "description": "Thin Pi integration for RTK command rewriting.",
+  "keywords": [
+    "pi-extension",
+    "pi-package",
+    "rtk",
+    "token-optimization"
+  ],
   "license": "MIT",
-  "author": "Author Name <author.name@mail.com>",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/author/library.git"
-  },
   "files": [
     "dist"
   ],
@@ -26,15 +23,23 @@
   "scripts": {
     "build": "vp pack",
     "dev": "vp pack --watch",
-    "test": "vp test",
     "check": "vp check",
     "prepublishOnly": "vp run build"
   },
   "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.80.10",
     "@types/node": "^26.1.1",
     "bumpp": "^11.1.0",
     "typescript": "^7.0.2",
     "vite": "catalog:",
     "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.mjs"
+    ]
   }
 }
