@@ -121,11 +121,7 @@ export default function piPlan(pi: ExtensionAPI): void {
   const setStatus = (ctx: ExtensionContext) =>
     ctx.ui.setStatus(
       "plan-mode",
-      state.phase === "ready"
-        ? "plan ready"
-        : state.phase === "planning"
-          ? "plan active"
-          : undefined,
+      state.phase === "ready" ? "plan ready" : state.phase === "planning" ? "plan" : undefined,
     );
 
   function findModel(ctx: ExtensionContext, id: string | undefined) {
