@@ -14,13 +14,7 @@ export default defineConfig({
     cache: true,
     tasks: {
       setup: {
-        command: [
-          "vp run -r build",
-          'pi install "$PWD/packages/pi-cache"',
-          'pi install "$PWD/packages/pi-compact"',
-          'pi install "$PWD/packages/pi-footer"',
-          'pi install "$PWD/packages/pi-rtk"',
-        ],
+        command: ["vp run -r build", "fd -td -d1 --threads=1 . packages -x pi install {}"],
         // This mutates the user's global Pi settings and must always run.
         cache: false,
       },
