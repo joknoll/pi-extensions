@@ -3,11 +3,9 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { GeneratedCompaction } from "./compactor.ts";
+import type { GeneratedCompaction } from "./types.ts";
 
-export type ReviewResult =
-  | { kind: "apply"; generated: GeneratedCompaction }
-  | { kind: "cancel"; reason?: string };
+export type ReviewResult = { kind: "apply"; generated: GeneratedCompaction } | { kind: "cancel" };
 
 function splitCommand(command: string): [string, string[]] {
   const tokens =
@@ -80,37 +78,30 @@ export async function reviewCompaction(
   ctx: ExtensionContext,
   editorCommand: string,
 ): Promise<ReviewResult> {
-  const { report, result, modelLabel } = generated;
-  const estimated = result.estimatedTokensAfter?.toLocaleString() ?? "unknown";
+  const details = generated.result.details;
   ctx.ui.notify(
-    `${generated.result.details?.profile ?? "balanced"} · ${modelLabel} · facts ${report.coveredFacts}/${report.totalFacts} · repairs ${report.repairCount} · ${result.tokensBefore.toLocaleString()} → ~${estimated} tokens`,
+    `${details?.profile ?? "balanced"} · ${generated.modelLabel} · evidence ${details?.preservedEvidence ?? 0} preserved, ${details?.omittedEvidence ?? 0} omitted`,
     "info",
   );
 
   const edited =
     ctx.mode === "tui"
-      ? await editInTui(ctx, result.summary, editorCommand)
-      : await ctx.ui.editor("Review smart compaction summary", result.summary);
-  if (edited === undefined) return { kind: "cancel", reason: "Editor cancelled or failed" };
+      ? await editInTui(ctx, generated.result.summary, editorCommand)
+      : await ctx.ui.editor("Review smart compaction summary", generated.result.summary);
+  if (edited === undefined) return { kind: "cancel" };
   if (!edited.trim()) {
     ctx.ui.notify("The compaction summary cannot be empty", "error");
-    return { kind: "cancel", reason: "Empty summary" };
+    return { kind: "cancel" };
   }
 
-  const changed = edited !== result.summary;
+  const changed = edited !== generated.result.summary;
   const confirmed = await ctx.ui.confirm(
     "Apply smart compaction?",
-    changed
-      ? "The edited summary is user-approved and will not be re-verified."
-      : `Apply the verified ${report.coveredFacts}/${report.totalFacts} fact summary?`,
+    changed ? "Apply the user-approved edited summary?" : "Apply the reviewed summary?",
   );
   if (!confirmed) return { kind: "cancel" };
 
-  const originalSummaryTokens = Math.ceil(result.summary.length / 4);
-  result.summary = edited;
-  if (result.details && changed) result.details.verification.status = "user-approved";
-  result.estimatedTokensAfter =
-    Math.max(0, (result.estimatedTokensAfter ?? 0) - originalSummaryTokens) +
-    Math.ceil(edited.length / 4);
+  generated.result.summary = edited;
+  if (details) details.status = changed ? "user-approved" : "reviewed";
   return { kind: "apply", generated };
 }

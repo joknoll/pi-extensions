@@ -1,7 +1,7 @@
 {
   "name": "@joknoll/pi-compact",
   "version": "0.0.0",
-  "description": "Audited, editable compaction checkpoints for Pi.",
+  "description": "Reviewed, editable native compaction checkpoints for Pi.",
   "keywords": [
     "compaction",
     "context",
@@ -24,6 +24,7 @@
     "build": "vp pack",
     "dev": "vp pack --watch",
     "check": "vp check",
+    "test": "vp test run",
     "prepublishOnly": "vp run build"
   },
   "devDependencies": {
