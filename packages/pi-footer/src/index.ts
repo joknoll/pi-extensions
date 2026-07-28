@@ -53,7 +53,6 @@ export default function piFooter(pi: ExtensionAPI): void {
           max: theme.fg("thinkingMax", thinkingLevel),
         }[thinkingLevel];
         const stats = [
-          thinkingText,
           theme.fg("dim", `↑${formatTokens(input)}/↓${formatTokens(output)}`),
           contextText && theme.fg("dim", contextText),
         ].filter(Boolean);
@@ -63,7 +62,7 @@ export default function piFooter(pi: ExtensionAPI): void {
         const statuses = footerData.getExtensionStatuses();
         const planMode = statuses.get("plan-mode");
         const cache = statuses.get("pi-cache");
-        const right = [planMode, modelText, cache, ...stats]
+        const right = [planMode, modelText, thinkingText, cache, ...stats]
           .filter(Boolean)
           .join(theme.fg("dim", " · "));
         const padding = " ".repeat(
