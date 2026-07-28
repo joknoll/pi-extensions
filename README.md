@@ -1,4 +1,4 @@
-# My Pi Config
+# @joknoll's Pi Coding Agent config
 
 At its core, a coding harness manages three things: context, tools, and the orchestration between LLMs and the developer.
 
