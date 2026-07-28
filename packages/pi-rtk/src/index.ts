@@ -9,7 +9,12 @@ export default async function piRtk(pi: ExtensionAPI) {
   if (!available) return;
 
   pi.on("tool_call", async (event, ctx) => {
-    if (!isToolCallEventType("bash", event) || !event.input.command.trim()) return;
+    if (
+      !isToolCallEventType("bash", event) ||
+      typeof event.input.command !== "string" ||
+      !event.input.command.trim()
+    )
+      return;
 
     try {
       const result = await pi.exec("rtk", ["rewrite", event.input.command], {
