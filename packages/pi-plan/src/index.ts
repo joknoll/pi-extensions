@@ -529,7 +529,7 @@ export default function piPlan(pi: ExtensionAPI): void {
           (option, index) => `${index + 1}. ${option.label.trim()} — ${option.impact.trim()}`,
         );
         const otherChoice = "Other";
-        const selected = await ctx.ui.select(`${question.header}: ${question.question}`, [
+        const selected = await showPlanSelect(ctx, `${question.header}: ${question.question}`, [
           ...choices,
           otherChoice,
         ]);
