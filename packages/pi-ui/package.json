@@ -23,7 +23,11 @@
     "build": "vp pack",
     "dev": "vp pack --watch",
     "check": "vp check",
+    "test": "vp test run",
     "prepublishOnly": "vp run build"
+  },
+  "dependencies": {
+    "diff": "catalog:"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.80.10",
