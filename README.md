@@ -78,3 +78,7 @@ https://pi.dev/packages/@minhduydev/pi-subagents
   - Manage parallel git worktrees for multiple sub-agents
 
 - decorated-pi replaces pi's built-in @ autocomplete with a high-speed file finder backed by @ff-labs/fff-node— a Rust SIMD fuzzy file search engine with in-memory index, frecency ranking, and git status awareness. Pi's native provider shells out to fd on every keystroke.
+
+## Pi Extensions
+
+- [@ff-labs/pi-fff](https://pi.dev/packages/@ff-labs/pi-fff) for faster autocomplete and find/grep

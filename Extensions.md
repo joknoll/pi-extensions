@@ -43,6 +43,7 @@
 - [pi-zentui](https://pi.dev/packages/pi-zentui)
 - [pi-spark](https://pi.dev/packages/pi-spark)
 - [pi-git-ui](https://github.com/spences10/my-pi/tree/main/packages/pi-git-ui)
+- [pi-tool-display](git@github.com:MasuRii/pi-tool-display.git)
 
 ## Orchestration
 
