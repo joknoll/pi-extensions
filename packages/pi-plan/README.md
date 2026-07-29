@@ -75,7 +75,7 @@ Invalid settings warn and fall back to inherited values without rewriting the fi
 
 Plans are archived under `$PI_CODING_AGENT_DIR/plans/`. Revisions overwrite the cycle's archive; new cycles create new files. Implementation and discard retain archives.
 
-Plan mode exposes only effective built-in inspection tools, a fail-closed restricted shell, structured questions, and structured completion. It blocks writing tools, unknown/custom tools, shell expansion and redirection, mutating Git, installers, and unknown commands. This is risk reduction, not an OS sandbox: allowed builds and checks can still run project hooks or create ignored artifacts.
+Plan mode exposes only effective built-in inspection tools, a fail-closed restricted shell, structured questions, and structured completion. The structured Plan tools are visible to the model only while Plan mode is active; implementation, discard, off-state session restoration, and shutdown restore normal tools without them. It blocks writing tools, unknown/custom tools, shell expansion and redirection, mutating Git, installers, and unknown commands. This is risk reduction, not an OS sandbox: allowed builds and checks can still run project hooks or create ignored artifacts.
 
 The clear-context implementation action writes a unique durable boundary and filters earlier conversation from subsequent model context. The visible session remains intact, and normal system/project instructions and tools remain available.
 

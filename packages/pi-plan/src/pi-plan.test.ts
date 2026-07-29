@@ -10,6 +10,7 @@ import {
   transformContext,
   validState,
   validateShell,
+  withoutInternalPlanTools,
   type PlanState,
 } from "./core.ts";
 import { completePlan } from "./index.ts";
@@ -64,6 +65,32 @@ test("Plan interaction waits emit Herdr blocked state without direct socket code
   expect(index).toContain('pi.events.emit("herdr:blocked", { active: true, label })');
   expect(index).toContain('pi.events.emit("herdr:blocked", { active: false, label })');
   expect(index).not.toContain("HERDR_SOCKET_PATH");
+});
+
+describe("internal Plan tool filtering", () => {
+  test("removes only internal tools while preserving order", () => {
+    expect(
+      withoutInternalPlanTools([
+        "read",
+        "plan_mode_question",
+        "custom",
+        "plan_mode_complete",
+        "bash",
+      ]),
+    ).toEqual(["read", "custom", "bash"]);
+  });
+
+  test("is idempotent and leaves normal tool lists unchanged", () => {
+    const normal = ["read", "custom", "bash"];
+    const filtered = withoutInternalPlanTools(normal);
+    expect(filtered).toEqual(normal);
+    expect(withoutInternalPlanTools(filtered)).toEqual(normal);
+  });
+
+  test("cleans internal tools from historical previous-tool data", () => {
+    const previousTools = ["edit", "plan_mode_complete", "write"];
+    expect(withoutInternalPlanTools(previousTools)).toEqual(["edit", "write"]);
+  });
 });
 
 describe("strict shell policy", () => {

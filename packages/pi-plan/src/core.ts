@@ -140,6 +140,11 @@ export function planningPrompt(baseline?: string): string {
 }
 
 export const BOUNDARY_TYPE = "pi-plan-implementation-boundary";
+export const INTERNAL_PLAN_TOOLS = ["plan_mode_question", "plan_mode_complete"] as const;
+
+export function withoutInternalPlanTools(toolNames: readonly string[]): string[] {
+  return toolNames.filter((name) => !(INTERNAL_PLAN_TOOLS as readonly string[]).includes(name));
+}
 
 interface MessageLike {
   role?: unknown;

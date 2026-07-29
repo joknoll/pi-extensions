@@ -11,11 +11,13 @@ import { Type } from "typebox";
 import {
   BOUNDARY_TYPE,
   DEFAULTS,
+  INTERNAL_PLAN_TOOLS,
   newCycle,
   offState,
   parseState,
   planningPrompt,
   transformContext,
+  withoutInternalPlanTools,
   type PlanCycle,
   type PlanState,
   type PlanningThinkingLevel,
@@ -48,7 +50,7 @@ import {
 
 const STATE_ENTRY = "pi-plan-state";
 const BUILTIN_PLAN_TOOLS = ["read", "grep", "find", "ls", "bash"];
-const INTERNAL_TOOLS = ["plan_mode_question", "plan_mode_complete"];
+const INTERNAL_TOOLS: readonly string[] = INTERNAL_PLAN_TOOLS;
 const THINKING_LEVELS = [
   "inherit",
   "off",
@@ -191,6 +193,12 @@ export default function piPlan(pi: ExtensionAPI): void {
     return approved;
   }
 
+  function deactivateInternalTools(): void {
+    const active = pi.getActiveTools();
+    const filtered = withoutInternalPlanTools(active);
+    if (filtered.length !== active.length) pi.setActiveTools(filtered);
+  }
+
   async function applyPlanning(ctx: ExtensionContext): Promise<void> {
     if (state.phase === "off") return;
     const cycle = state.cycle;
@@ -241,7 +249,9 @@ export default function piPlan(pi: ExtensionAPI): void {
     pi.setThinkingLevel(cycle.previousThinking);
     const all = pi.getAllTools();
     const available = new Set(all.map((tool) => tool.name));
-    const restored = cycle.previousTools.filter((name) => available.has(name));
+    const restored = withoutInternalPlanTools(cycle.previousTools).filter((name) =>
+      available.has(name),
+    );
     pi.setActiveTools(restored);
   }
 
@@ -518,7 +528,7 @@ export default function piPlan(pi: ExtensionAPI): void {
           version: 2,
           phase: "planning",
           cycle: newCycle({
-            previousTools: pi.getActiveTools(),
+            previousTools: withoutInternalPlanTools(pi.getActiveTools()),
             previousModel: modelId(ctx.model),
             previousThinking: pi.getThinkingLevel(),
             planningModel: preferences.model,
@@ -532,7 +542,10 @@ export default function piPlan(pi: ExtensionAPI): void {
   });
 
   pi.on("before_agent_start", async (event, ctx) => {
-    if (state.phase === "off") return;
+    if (state.phase === "off") {
+      deactivateInternalTools();
+      return;
+    }
     if (state.phase === "ready") {
       state = { ...state, phase: "planning" };
       state.cycle.revision += 1;
@@ -619,7 +632,10 @@ export default function piPlan(pi: ExtensionAPI): void {
       }
     }
     if (state.phase !== "off") await applyPlanning(ctx);
-    else setStatus(ctx);
+    else {
+      deactivateInternalTools();
+      setStatus(ctx);
+    }
     installTerminalListener(ctx);
   });
 
