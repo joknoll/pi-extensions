@@ -33,6 +33,33 @@ Shift+Tab must be available to the extension. Move `app.thinking.cycle` to anoth
 
 Planning options include inherited settings, models allowed by Pi's `enabledModels` setting, and efforts from `off` through `max`. Add each planning model as its model ID (or `provider/model` ID) in Pi's configuration. Pi may clamp effort to model capabilities. The entry model, effort, and exact available tool set are restored on implementation or exit.
 
+## Clarification questions
+
+`plan_mode_question` asks one to three structured questions. Each question declares an explicit `type`:
+
+- `single_choice` / `multiple_choice` — require 2 to 4 `{ label, impact }` options. A synthetic "Other" choice is always added; option labels may not collide with it (case-insensitively).
+- `yes_no` — presents a fixed Yes/No choice; no options and no "Other".
+- `essay` — opens Pi's built-in multiline editor; no options and no "Other".
+
+Keyboard controls:
+
+- **Single Choice / Yes-No**: ↑↓ choose, ←→ move between questions, Enter submit, Esc/Ctrl+C cancel.
+- **Multiple Choice**: ↑↓ move, Space toggle, Enter submit (at least one selection required), ←→ move between questions, Esc/Ctrl+C cancel.
+- **Essay**: ←→ move between questions, Enter opens the multiline editor, Esc/Ctrl+C cancel.
+
+Choosing "Other" (Single/Multiple Choice) opens a text prompt; cancelling that prompt returns to the question instead of cancelling the batch, and deselecting/reselecting "Other" lets the value be changed. Navigating back to an already-answered question restores its prior answer.
+
+Answers are returned in question order, one per question, as a typed union:
+
+```json
+{ "id": "...", "type": "single_choice", "label": "...", "other": "optional custom text" }
+{ "id": "...", "type": "multiple_choice", "labels": ["...", "Other"], "other": "optional custom text" }
+{ "id": "...", "type": "yes_no", "answer": true }
+{ "id": "...", "type": "essay", "text": "..." }
+```
+
+Cancelling any question, submitting an empty custom/essay answer, or a Plan-mode cycle change while a question is open returns `{ "cancelled": true, "answers": [] }` with no partial answers.
+
 Global defaults live at `$PI_CODING_AGENT_DIR/pi-plan.json` (normally `~/.pi/agent/pi-plan.json`):
 
 ```json

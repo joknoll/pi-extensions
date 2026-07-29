@@ -1,5 +1,4 @@
 import { fileURLToPath } from "node:url";
-import { styleText } from "node:util";
 import { resolve } from "node:path";
 import {
   defineTool,
@@ -8,7 +7,6 @@ import {
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { matchesKey } from "@earendil-works/pi-tui";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
   BOUNDARY_TYPE,
@@ -25,8 +23,13 @@ import {
   validateShell,
 } from "./core.ts";
 import {
+  normalizeQuestions,
+  PlanQuestionsParamsSchema,
+  type PlanAnswer,
+  type PlanQuestionsResult,
+} from "./questions.ts";
+import {
   agentDir,
-  editArchivedPlan,
   ensurePlanArchive,
   isArchivePath,
   loadPreferences,
@@ -35,6 +38,13 @@ import {
   savePreferences,
   writePlanArchive,
 } from "./storage.ts";
+import {
+  editArchivedPlan,
+  showPlanQuestion,
+  showPlanSelect,
+  showReadyMenu,
+  type ReadyIntent,
+} from "./ui.ts";
 
 const STATE_ENTRY = "pi-plan-state";
 const BUILTIN_PLAN_TOOLS = ["read", "grep", "find", "ls", "bash"];
@@ -50,122 +60,6 @@ const THINKING_LEVELS = [
   "max",
 ] as const;
 const EXTENSION_PATH = resolve(fileURLToPath(import.meta.url));
-type ReadyIntent = "implement" | "clear" | "keep" | "discard" | "edit";
-const READY_OPTIONS: Array<{ label: string; intent: ReadyIntent }> = [
-  { label: "Implement plan", intent: "implement" },
-  { label: "Implement plan and clear context", intent: "clear" },
-  { label: "Keep planning", intent: "keep" },
-  { label: "Exit / discard", intent: "discard" },
-];
-
-function paintBackground(line: string, background: string): string {
-  if (!background) return line;
-  return `${background}${line.replaceAll("\x1b[0m", `\x1b[0m${background}`)}\x1b[49m`;
-}
-
-function paintPlanLine(line: string, width: number, background: string): string {
-  const truncated = truncateToWidth(line, width);
-  return paintBackground(
-    `${truncated}${" ".repeat(Math.max(0, width - visibleWidth(truncated)))}`,
-    background,
-  );
-}
-
-async function showPlanSelect(
-  ctx: ExtensionContext,
-  title: string,
-  options: readonly string[],
-): Promise<string | undefined> {
-  if (ctx.mode !== "tui") return undefined;
-  const background = ctx.ui.theme.getBgAnsi("userMessageBg");
-  return ctx.ui.custom<string | undefined>((tui, _theme, _keybindings, done) => {
-    let selected = 0;
-    return {
-      handleInput(data: string) {
-        if (matchesKey(data, "escape") || matchesKey(data, "ctrl+c")) done(undefined);
-        else if (matchesKey(data, "return")) done(options[selected]);
-        else if (matchesKey(data, "up")) {
-          selected = (selected + options.length - 1) % options.length;
-          tui.requestRender();
-        } else if (matchesKey(data, "down")) {
-          selected = (selected + 1) % options.length;
-          tui.requestRender();
-        }
-      },
-      invalidate() {},
-      render(width: number) {
-        const inset = "  ";
-        const divider = styleText(["cyan", "dim"], "─".repeat(Math.max(1, width - 4)));
-        const lines = [
-          "",
-          `${inset}${styleText(["cyan", "bold"], title)}`,
-          `${inset}${divider}`,
-          "",
-        ];
-        for (let index = 0; index < options.length; index += 1) {
-          const prefix = index === selected ? "› " : "  ";
-          lines.push(`${inset}${styleText("cyan", `${prefix}${options[index]}`)}`);
-        }
-        lines.push(
-          "",
-          `${inset}${divider}`,
-          `${inset}${styleText(["cyan", "dim"], "↑↓ navigate  enter select  escape/ctrl+c cancel")}`,
-          "",
-        );
-        return lines.map((line) => paintPlanLine(line, width, background));
-      },
-    };
-  });
-}
-
-async function showReadyMenu(
-  ctx: ExtensionContext,
-  archivePath: string,
-): Promise<ReadyIntent | undefined> {
-  if (ctx.mode !== "tui") return undefined;
-  const background = ctx.ui.theme.getBgAnsi("userMessageBg");
-  return ctx.ui.custom<ReadyIntent>((tui, _theme, _keybindings, done) => {
-    let selected = 0;
-    return {
-      handleInput(data: string) {
-        const finish = (intent: ReadyIntent) => done(intent);
-        if (matchesKey(data, "escape")) finish("keep");
-        else if (matchesKey(data, "ctrl+e")) finish("edit");
-        else if (matchesKey(data, "return")) finish(READY_OPTIONS[selected].intent);
-        else if (matchesKey(data, "up")) {
-          selected = (selected + READY_OPTIONS.length - 1) % READY_OPTIONS.length;
-          tui.requestRender();
-        } else if (matchesKey(data, "down")) {
-          selected = (selected + 1) % READY_OPTIONS.length;
-          tui.requestRender();
-        }
-      },
-      invalidate() {},
-      render(width: number) {
-        const inset = "  ";
-        const divider = styleText(["cyan", "dim"], "─".repeat(Math.max(1, width - 4)));
-        const lines = [
-          "",
-          `${inset}${styleText(["cyan", "bold"], "Plan ready")}`,
-          `${inset}${divider}`,
-          "",
-        ];
-        for (let index = 0; index < READY_OPTIONS.length; index += 1) {
-          const prefix = index === selected ? "› " : "  ";
-          lines.push(`${inset}${styleText("cyan", `${prefix}${READY_OPTIONS[index].label}`)}`);
-        }
-        lines.push(
-          "",
-          `${inset}${divider}`,
-          `${inset}${styleText(["cyan", "dim"], "Ctrl+E edit archive · Esc keep planning")}`,
-          `${inset}${styleText(["cyan", "dim"], archivePath)}`,
-          "",
-        );
-        return lines.map((line) => paintPlanLine(line, width, background));
-      },
-    };
-  });
-}
 
 function modelId(model: { provider: string; id: string } | undefined): string | undefined {
   return model ? `${model.provider}/${model.id}` : undefined;
@@ -467,87 +361,50 @@ export default function piPlan(pi: ExtensionAPI): void {
   const questionTool = defineTool({
     name: "plan_mode_question",
     label: "Plan clarification",
-    description: "Ask one to three structured material clarification questions.",
-    parameters: Type.Object(
-      {
-        questions: Type.Array(
-          Type.Object(
-            {
-              id: Type.String({ minLength: 1, maxLength: 64 }),
-              header: Type.String({ minLength: 1, maxLength: 80 }),
-              question: Type.String({ minLength: 1, maxLength: 500 }),
-              options: Type.Array(
-                Type.Object(
-                  {
-                    label: Type.String({ minLength: 1, maxLength: 120 }),
-                    impact: Type.String({ minLength: 1, maxLength: 300 }),
-                  },
-                  { additionalProperties: false },
-                ),
-                { minItems: 2, maxItems: 4 },
-              ),
-            },
-            { additionalProperties: false },
-          ),
-          { minItems: 1, maxItems: 3 },
-        ),
-      },
-      { additionalProperties: false },
-    ),
+    description:
+      "Ask one to three structured material clarification questions. Each question is single_choice, multiple_choice, yes_no, or essay.",
+    parameters: PlanQuestionsParamsSchema,
     async execute(_id, params, _signal, _update, ctx) {
-      const cancelled = () => ({
-        content: [
-          { type: "text" as const, text: JSON.stringify({ cancelled: true, answers: [] }) },
-        ],
-        details: {
-          cancelled: true,
-          answers: [] as Array<{ id: string; label: string; other?: string }>,
-        },
-      });
+      const cancelled = (): {
+        content: [{ type: "text"; text: string }];
+        details: PlanQuestionsResult;
+      } => {
+        const result: PlanQuestionsResult = { cancelled: true, answers: [] };
+        return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
+      };
       if (state.phase === "off" || !ctx.hasUI) return cancelled();
-      const ids = new Set<string>();
-      for (const question of params.questions) {
-        question.id = question.id.trim();
-        question.header = question.header.trim();
-        question.question = question.question.trim();
-        if (!question.id || !question.header || !question.question || ids.has(question.id))
-          return cancelled();
-        ids.add(question.id);
-        const labels = question.options.map((option) => option.label.trim());
-        if (
-          labels.some((label) => !label) ||
-          question.options.some((option) => !option.impact.trim()) ||
-          new Set(labels).size !== labels.length
-        )
-          return cancelled();
-      }
+      const questions = normalizeQuestions(params.questions);
+      if (!questions) return cancelled();
       const expectedCycle = state.cycle.id;
       const currentCycleId = () => (state.phase === "off" ? undefined : state.cycle.id);
-      const answers: Array<{ id: string; label: string; other?: string }> = [];
-      for (const question of params.questions) {
-        const choices = question.options.map(
-          (option, index) => `${index + 1}. ${option.label.trim()} — ${option.impact.trim()}`,
+      const answers: Array<PlanAnswer | undefined> = Array.from({ length: questions.length });
+      let questionIndex = 0;
+      while (questionIndex < questions.length) {
+        const question = questions[questionIndex];
+        const outcome = await showPlanQuestion(
+          ctx,
+          question,
+          answers[questionIndex],
+          questionIndex,
+          questions.length,
         );
-        const otherChoice = "Other";
-        const selected = await showPlanSelect(ctx, `${question.header}: ${question.question}`, [
-          ...choices,
-          otherChoice,
-        ]);
-        if (!selected || currentCycleId() !== expectedCycle) return cancelled();
-        if (selected === otherChoice) {
-          const other = await ctx.ui.input(question.header, question.question);
-          if (!other?.trim()) return cancelled();
-          answers.push({ id: question.id, label: "Other", other: other.trim() });
-        } else {
-          const index = choices.indexOf(selected);
-          if (index < 0) return cancelled();
-          answers.push({ id: question.id, label: question.options[index].label.trim() });
+        if (!outcome || currentCycleId() !== expectedCycle) return cancelled();
+        if (outcome === "previous") {
+          questionIndex = Math.max(0, questionIndex - 1);
+          continue;
         }
+        if (outcome === "next") {
+          questionIndex = Math.min(questions.length - 1, questionIndex + 1);
+          continue;
+        }
+        answers[questionIndex] = outcome.answer;
+        const nextUnanswered = answers.findIndex((answer) => answer === undefined);
+        if (nextUnanswered < 0) break;
+        questionIndex = nextUnanswered;
       }
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify({ cancelled: false, answers }) }],
-        details: { cancelled: false, answers },
-      };
+      if (answers.some((answer) => answer === undefined)) return cancelled();
+      const result: PlanQuestionsResult = { cancelled: false, answers: answers as PlanAnswer[] };
+      return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
     },
   });
 

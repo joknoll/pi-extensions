@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import { lstat, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
-import { SettingsManager, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { DEFAULTS, type Preferences, validPreferences } from "./core.ts";
 
 export const MAX_PLAN_SIZE = 256_000;
@@ -132,7 +131,7 @@ function splitEditorCommand(command: string): [string, string[]] {
   return [executable, tokens];
 }
 
-async function launchEditor(command: string, path: string): Promise<number | null> {
+export async function launchEditor(command: string, path: string): Promise<number | null> {
   const [executable, args] = splitEditorCommand(command);
   return new Promise((done) => {
     const child = spawn(executable, [...args, path], {
@@ -166,33 +165,4 @@ export async function acceptEditedArchive(
     await writePlanArchive(previous, path);
     throw error;
   }
-}
-
-export async function editArchivedPlan(
-  ctx: ExtensionContext,
-  plan: string,
-  archivePath: string,
-): Promise<{ plan: string; archivePath: string; changed: boolean }> {
-  if (ctx.mode !== "tui") return { plan, archivePath, changed: false };
-  const path = await ensurePlanArchive(plan, archivePath);
-  const previous = await readPlanArchive(path);
-  const editor = SettingsManager.create(ctx.cwd, agentDir()).getExternalEditorCommand();
-  if (!editor) throw new Error("No external editor is configured");
-  const exitCode = await ctx.ui.custom<number | null>(async (tui, _theme, _keys, done) => {
-    let result: number | null = null;
-    tui.stop();
-    try {
-      process.stdout.write(
-        `Launching external editor: ${editor}\nPi will resume when the editor exits.\n`,
-      );
-      result = await launchEditor(editor, path);
-    } finally {
-      tui.start();
-      tui.requestRender(true);
-    }
-    done(result);
-    return { invalidate() {}, render: () => ["Returning from external editor…"] };
-  });
-  const edited = await acceptEditedArchive(path, previous, exitCode);
-  return { plan: edited, archivePath: path, changed: edited !== plan };
 }
