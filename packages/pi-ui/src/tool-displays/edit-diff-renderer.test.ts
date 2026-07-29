@@ -25,6 +25,21 @@ const patch = `--- a/example.ts
  const twelve = 12;
 `;
 
+function stripAnsi(text: string): string {
+  let plain = "";
+  for (let index = 0; index < text.length;) {
+    if (text[index] === "\x1b" && text[index + 1] === "[") {
+      const end = text.indexOf("m", index + 2);
+      if (end >= 0) {
+        index = end + 1;
+        continue;
+      }
+    }
+    plain += text[index++];
+  }
+  return plain;
+}
+
 const theme = {
   name: "test",
   fg: (_color: string, text: string) => text,
@@ -92,6 +107,12 @@ describe("edit diff rendering", () => {
     expect(compact.every((line) => visibleWidth(line) <= 60)).toBe(true);
     expect(compact.join("\n")).not.toContain("[48;");
     expect(compact.join("\n")).toContain("\x1b[1;4m");
+  });
+
+  test("preserves whitespace omitted by syntax tokenizer tokens", () => {
+    const rendered = new EditDiffRenderer(patch, "", "example.ts", false, theme).render(70);
+    const plain = stripAnsi(rendered.join("\n"));
+    expect(plain).toContain('const value = "new";');
   });
 
   test("renders unknown languages with non-truecolor theme values", () => {

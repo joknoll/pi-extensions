@@ -1,11 +1,17 @@
-import {
-  getLanguageFromPath,
-  highlightCode,
-  keyHint,
-  type Theme,
-} from "@earendil-works/pi-coding-agent";
+import { extname } from "node:path";
+import { keyHint, type Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
 import { diffWords, parsePatch } from "diff";
+// The package's NodeNext declarations use extensionless re-exports, although these are runtime exports.
+// @ts-expect-error TS cannot follow ts-syntax-highlighter's extensionless declaration re-exports.
+import { getLanguageByExtension, Tokenizer } from "ts-syntax-highlighter";
+
+interface SyntaxToken {
+  type: string;
+  content: string;
+  scopes: string[];
+  offset: number;
+}
 
 const COLLAPSED_ROWS = 16;
 const MIN_SPLIT_WIDTH = 88;
@@ -155,16 +161,61 @@ function applyRanges(text: string, ranges: WordRange[], start: string, end: stri
   return result;
 }
 
+// Visual Studio Code's built-in Dark+ scope colors.
+const VSCODE_DARK_PLUS: ReadonlyArray<readonly [scope: string, ansi: string]> = [
+  ["comment.line", "\x1b[38;2;106;153;85m"],
+  ["comment.block", "\x1b[38;2;106;153;85m"],
+  ["keyword.control", "\x1b[38;2;197;134;192m"],
+  ["keyword.operator", "\x1b[38;2;212;212;212m"],
+  ["storage.type", "\x1b[38;2;86;156;214m"],
+  ["string.quoted.double", "\x1b[38;2;206;145;120m"],
+  ["string.quoted.single", "\x1b[38;2;206;145;120m"],
+  ["string.template", "\x1b[38;2;206;145;120m"],
+  ["constant.numeric", "\x1b[38;2;181;206;168m"],
+  ["entity.name.function", "\x1b[38;2;220;220;170m"],
+  ["entity.name.type", "\x1b[38;2;78;201;176m"],
+  ["support.type", "\x1b[38;2;78;201;176m"],
+  ["constant.language", "\x1b[38;2;86;156;214m"],
+  ["variable", "\x1b[38;2;156;220;254m"],
+  ["operator", "\x1b[38;2;212;212;212m"],
+  ["punctuation", "\x1b[38;2;212;212;212m"],
+];
+const VSCODE_DARK_PLUS_FOREGROUND = "\x1b[38;2;212;212;212m";
+
+function tokenColor(token: SyntaxToken): string {
+  const scopes = [token.type, ...token.scopes].map((scope) => scope.toLowerCase());
+  for (const [wanted, color] of VSCODE_DARK_PLUS) {
+    if (scopes.some((scope) => scope === wanted || scope.startsWith(`${wanted}.`))) return color;
+  }
+  return VSCODE_DARK_PLUS_FOREGROUND;
+}
+
 function highlighted(lines: EditDiffLine[], path: string): Map<EditDiffLine, string> {
   const result = new Map<EditDiffLine, string>();
   if (!lines.length) return result;
-  let output: string[];
   try {
-    output = highlightCode(lines.map((line) => line.content).join("\n"), getLanguageFromPath(path));
+    const language = getLanguageByExtension(extname(path));
+    if (!language) return result;
+    const tokenLines = new Tokenizer(language.grammar).tokenize(
+      lines.map((line) => line.content).join("\n"),
+    );
+    lines.forEach((line, index) => {
+      const tokens = tokenLines[index]?.tokens;
+      if (!tokens) return;
+      let cursor = 0;
+      let highlightedLine = "";
+      for (const token of tokens as SyntaxToken[]) {
+        // The tokenizer omits whitespace tokens; restore gaps from each token's source offset.
+        highlightedLine += line.content.slice(cursor, token.offset);
+        highlightedLine += `${tokenColor(token)}${token.content}\x1b[39m`;
+        cursor = token.offset + token.content.length;
+      }
+      highlightedLine += line.content.slice(cursor);
+      result.set(line, highlightedLine);
+    });
   } catch {
-    output = lines.map((line) => line.content);
+    // Unsupported or malformed input remains readable without highlighting.
   }
-  lines.forEach((line, index) => result.set(line, output[index] ?? line.content));
   return result;
 }
 

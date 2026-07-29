@@ -27,7 +27,8 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "diff": "catalog:"
+    "diff": "catalog:",
+    "ts-syntax-highlighter": "catalog:"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.80.10",
