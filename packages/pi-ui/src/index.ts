@@ -1,4 +1,5 @@
 import { CustomEditor, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { registerWriteDisplay } from "./write-display.ts";
 
 export function paintBackground(line: string, background: string): string {
   if (!background) return line;
@@ -30,6 +31,8 @@ class PiEditor extends CustomEditor {
 }
 
 export default function piUi(pi: ExtensionAPI): void {
+  registerWriteDisplay(pi);
+
   pi.on("session_start", (_event, ctx) => {
     ctx.ui.setEditorComponent((tui, theme, keybindings) => {
       const editor = new PiEditor(tui, theme, keybindings);
