@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { showPlanQuestion } from "./ui.ts";
+import { contextUsageIndicator, showPlanQuestion } from "./ui.ts";
 import type {
   EssayAnswer,
   EssayQuestion,
@@ -97,6 +97,18 @@ const essayQuestion: EssayQuestion = {
   question: "Explain",
   type: "essay",
 };
+
+describe("context usage indicator", () => {
+  test("rounds the current context-use percentage", () => {
+    const ctx = { getContextUsage: () => ({ percent: 69.6 }) } as ExtensionContext;
+    expect(contextUsageIndicator(ctx)).toBe(" (70%)");
+  });
+
+  test("omits the indicator when usage is unavailable", () => {
+    const ctx = { getContextUsage: () => undefined } as ExtensionContext;
+    expect(contextUsageIndicator(ctx)).toBe("");
+  });
+});
 
 describe("single choice question", () => {
   test("selects a declared option", async () => {

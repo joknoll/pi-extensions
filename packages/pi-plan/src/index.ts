@@ -344,6 +344,20 @@ export default function piPlan(pi: ExtensionAPI): void {
     }
   }
 
+  function compactThenImplement(ctx: ExtensionContext, nonce: string): void {
+    if (state.phase !== "ready" || completionNonce(state.cycle) !== nonce) return;
+    ctx.ui.notify("Compacting context before implementation", "info");
+    ctx.compact({
+      customInstructions:
+        "Preserve the approved implementation plan and the planning decisions, findings, and constraints needed to implement it.",
+      onComplete: () => {
+        if (state.phase === "ready" && completionNonce(state.cycle) === nonce)
+          void implementationHandoff(ctx, false);
+      },
+      onError: (error) => ctx.ui.notify(`Could not compact context: ${error.message}`, "error"),
+    });
+  }
+
   async function editPlanAndReopen(ctx: ExtensionContext, expectedNonce: string): Promise<void> {
     if (editorOpen || state.phase !== "ready" || completionNonce(state.cycle) !== expectedNonce)
       return;
@@ -374,6 +388,7 @@ export default function piPlan(pi: ExtensionAPI): void {
   ): Promise<void> {
     if (!intent || state.phase !== "ready" || completionNonce(state.cycle) !== nonce) return;
     if (intent === "implement") await implementationHandoff(ctx, false);
+    else if (intent === "compact") compactThenImplement(ctx, nonce);
     else if (intent === "clear") await implementationHandoff(ctx, true);
     else if (intent === "discard") await discard(ctx);
     else if (intent === "edit") await editPlanAndReopen(ctx, nonce);

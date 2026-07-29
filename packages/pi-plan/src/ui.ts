@@ -22,9 +22,10 @@ import {
   readPlanArchive,
 } from "./storage.ts";
 
-export type ReadyIntent = "implement" | "clear" | "keep" | "discard" | "edit";
+export type ReadyIntent = "implement" | "compact" | "clear" | "keep" | "discard" | "edit";
 export const READY_OPTIONS: Array<{ label: string; intent: ReadyIntent }> = [
   { label: "Implement plan", intent: "implement" },
+  { label: "Implement plan and compact", intent: "compact" },
   { label: "Implement plan and clear context", intent: "clear" },
   { label: "Keep planning", intent: "keep" },
   { label: "Exit / discard", intent: "discard" },
@@ -87,12 +88,18 @@ export async function showPlanSelect(
   });
 }
 
+export function contextUsageIndicator(ctx: Pick<ExtensionContext, "getContextUsage">): string {
+  const percent = ctx.getContextUsage()?.percent;
+  return percent == null || !Number.isFinite(percent) ? "" : ` (${Math.round(percent)}%)`;
+}
+
 export async function showReadyMenu(
   ctx: ExtensionContext,
   archivePath: string,
 ): Promise<ReadyIntent | undefined> {
   if (ctx.mode !== "tui") return undefined;
   const background = ctx.ui.theme.getBgAnsi("userMessageBg");
+  const clearContextLabel = `${READY_OPTIONS.find((option) => option.intent === "clear")?.label}${contextUsageIndicator(ctx)}`;
   return ctx.ui.custom<ReadyIntent>((tui, _theme, _keybindings, done) => {
     let selected = 0;
     return {
@@ -115,7 +122,9 @@ export async function showReadyMenu(
         const lines = ["", `${INSET}${styleText("bold", "Plan ready")}`, divider, ""];
         for (let index = 0; index < READY_OPTIONS.length; index += 1) {
           const prefix = index === selected ? "› " : "  ";
-          const text = `${prefix}${READY_OPTIONS[index].label}`;
+          const option = READY_OPTIONS[index];
+          const label = option.intent === "clear" ? clearContextLabel : option.label;
+          const text = `${prefix}${label}`;
           lines.push(`${INSET}${index === selected ? styleText(["cyan", "bold"], text) : text}`);
         }
         lines.push(
