@@ -3,16 +3,12 @@ import { SettingsManager, type ExtensionContext } from "@earendil-works/pi-codin
 import { matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import {
   OTHER_LABEL,
-  type EssayAnswer,
-  type EssayQuestion,
   type MultipleChoiceAnswer,
   type MultipleChoiceQuestion,
   type PlanAnswer,
   type PlanQuestion,
   type SingleChoiceAnswer,
   type SingleChoiceQuestion,
-  type YesNoAnswer,
-  type YesNoQuestion,
 } from "./questions.ts";
 import {
   acceptEditedArchive,
@@ -328,86 +324,6 @@ async function showMultipleChoiceQuestion(
   }
 }
 
-async function showYesNoQuestion(
-  ctx: ExtensionContext,
-  question: YesNoQuestion,
-  previous: YesNoAnswer | undefined,
-  index: number,
-  total: number,
-): Promise<QuestionOutcome> {
-  const rows = ["Yes", "No"];
-  let selected = previous === undefined ? 0 : previous.answer ? 0 : 1;
-  const background = ctx.ui.theme.getBgAnsi("userMessageBg");
-  const outcome = await ctx.ui.custom<"previous" | "next" | "select" | undefined>(
-    (tui, _theme, _keys, done) => ({
-      handleInput(data: string) {
-        if (matchesKey(data, "escape") || matchesKey(data, "ctrl+c")) done(undefined);
-        else if (matchesKey(data, "left")) done("previous");
-        else if (matchesKey(data, "right")) done("next");
-        else if (matchesKey(data, "up")) {
-          selected = (selected + rows.length - 1) % rows.length;
-          tui.requestRender();
-        } else if (matchesKey(data, "down")) {
-          selected = (selected + 1) % rows.length;
-          tui.requestRender();
-        } else if (matchesKey(data, "return")) done("select");
-      },
-      invalidate() {},
-      render(width: number) {
-        const lines = frameTop(index, total, question.question);
-        for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
-          const text = `${rowIndex + 1}. ${rows[rowIndex]}`;
-          lines.push(optionRow(rowIndex === selected ? "› " : "  ", text, rowIndex === selected));
-        }
-        lines.push(...frameBottom("↑↓ choose  ←→ questions  enter submit  esc interrupt"));
-        return lines.map((line) => paintPlanLine(line, width, background));
-      },
-    }),
-  );
-  if (outcome === undefined || outcome === "previous" || outcome === "next") return outcome;
-  return { answer: { id: question.id, type: "yes_no", answer: selected === 0 } };
-}
-
-async function showEssayQuestion(
-  ctx: ExtensionContext,
-  question: EssayQuestion,
-  previous: EssayAnswer | undefined,
-  index: number,
-  total: number,
-): Promise<QuestionOutcome> {
-  const background = ctx.ui.theme.getBgAnsi("userMessageBg");
-  for (;;) {
-    const outcome = await ctx.ui.custom<"previous" | "next" | "select" | undefined>(
-      (_tui, _theme, _keys, done) => ({
-        handleInput(data: string) {
-          if (matchesKey(data, "escape") || matchesKey(data, "ctrl+c")) done(undefined);
-          else if (matchesKey(data, "left")) done("previous");
-          else if (matchesKey(data, "right")) done("next");
-          else if (matchesKey(data, "return")) done("select");
-        },
-        invalidate() {},
-        render(width: number) {
-          const lines = frameTop(index, total, question.question);
-          lines.push(
-            `${INSET}${styleText("gray", previous?.text ? "Current answer:" : "No answer yet")}`,
-          );
-          if (previous?.text)
-            lines.push(`${INSET}${truncateToWidth(previous.text.split("\n")[0], width)}`);
-          lines.push("");
-          lines.push(...frameBottom("enter write answer  ←→ questions  esc interrupt"));
-          return lines.map((line) => paintPlanLine(line, width, background));
-        },
-      }),
-    );
-    if (outcome === undefined || outcome === "previous" || outcome === "next") return outcome;
-    const text = await ctx.ui.editor(question.header, previous?.text ?? "");
-    if (text === undefined) continue;
-    const trimmed = text.trim();
-    if (!trimmed) continue;
-    return { answer: { id: question.id, type: "essay", text: trimmed } };
-  }
-}
-
 export async function showPlanQuestion(
   ctx: ExtensionContext,
   question: PlanQuestion,
@@ -429,22 +345,6 @@ export async function showPlanQuestion(
         ctx,
         question,
         previous?.type === "multiple_choice" ? previous : undefined,
-        index,
-        total,
-      );
-    case "yes_no":
-      return showYesNoQuestion(
-        ctx,
-        question,
-        previous?.type === "yes_no" ? previous : undefined,
-        index,
-        total,
-      );
-    case "essay":
-      return showEssayQuestion(
-        ctx,
-        question,
-        previous?.type === "essay" ? previous : undefined,
         index,
         total,
       );

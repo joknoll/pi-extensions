@@ -34,21 +34,9 @@ const MultipleChoiceQuestionSchema = Type.Object(
   { additionalProperties: false },
 );
 
-const YesNoQuestionSchema = Type.Object(
-  { ...questionBase, type: Type.Literal("yes_no") },
-  { additionalProperties: false },
-);
-
-const EssayQuestionSchema = Type.Object(
-  { ...questionBase, type: Type.Literal("essay") },
-  { additionalProperties: false },
-);
-
 export const PlanQuestionSchema = Type.Union([
   SingleChoiceQuestionSchema,
   MultipleChoiceQuestionSchema,
-  YesNoQuestionSchema,
-  EssayQuestionSchema,
 ]);
 
 export const PlanQuestionsParamsSchema = Type.Object(
@@ -59,8 +47,6 @@ export const PlanQuestionsParamsSchema = Type.Object(
 export type QuestionOption = Static<typeof QuestionOptionSchema>;
 export type SingleChoiceQuestion = Static<typeof SingleChoiceQuestionSchema>;
 export type MultipleChoiceQuestion = Static<typeof MultipleChoiceQuestionSchema>;
-export type YesNoQuestion = Static<typeof YesNoQuestionSchema>;
-export type EssayQuestion = Static<typeof EssayQuestionSchema>;
 export type PlanQuestion = Static<typeof PlanQuestionSchema>;
 export type PlanQuestionsParams = Static<typeof PlanQuestionsParamsSchema>;
 
@@ -76,9 +62,7 @@ export type MultipleChoiceAnswer = {
   labels: string[];
   other?: string;
 };
-export type YesNoAnswer = { id: string; type: "yes_no"; answer: boolean };
-export type EssayAnswer = { id: string; type: "essay"; text: string };
-export type PlanAnswer = SingleChoiceAnswer | MultipleChoiceAnswer | YesNoAnswer | EssayAnswer;
+export type PlanAnswer = SingleChoiceAnswer | MultipleChoiceAnswer;
 export type PlanQuestionsResult = { cancelled: boolean; answers: PlanAnswer[] };
 
 function normalizeOptions(options: readonly QuestionOption[]): QuestionOption[] | undefined {
@@ -105,13 +89,9 @@ export function normalizeQuestions(questions: readonly PlanQuestion[]): PlanQues
     const prompt = question.question.trim();
     if (!id || !header || !prompt || ids.has(id)) return undefined;
     ids.add(id);
-    if (question.type === "single_choice" || question.type === "multiple_choice") {
-      const options = normalizeOptions(question.options);
-      if (!options) return undefined;
-      normalized.push({ ...question, id, header, question: prompt, options });
-    } else {
-      normalized.push({ ...question, id, header, question: prompt });
-    }
+    const options = normalizeOptions(question.options);
+    if (!options) return undefined;
+    normalized.push({ ...question, id, header, question: prompt, options });
   }
   return normalized;
 }

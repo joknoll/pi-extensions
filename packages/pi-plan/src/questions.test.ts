@@ -23,16 +23,12 @@ const multipleChoice: PlanQuestion = {
   type: "multiple_choice",
   options: [option("A"), option("B")],
 };
-const yesNo: PlanQuestion = { id: "yn", header: "Header", question: "OK?", type: "yes_no" };
-const essay: PlanQuestion = { id: "es", header: "Header", question: "Explain", type: "essay" };
 
 describe("plan question schema", () => {
   test("accepts each valid variant and a mixed batch", () => {
     expect(Check(PlanQuestionsParamsSchema, { questions: [singleChoice] })).toBe(true);
     expect(Check(PlanQuestionsParamsSchema, { questions: [multipleChoice] })).toBe(true);
-    expect(Check(PlanQuestionsParamsSchema, { questions: [yesNo] })).toBe(true);
-    expect(Check(PlanQuestionsParamsSchema, { questions: [essay] })).toBe(true);
-    expect(Check(PlanQuestionsParamsSchema, { questions: [singleChoice, yesNo, essay] })).toBe(
+    expect(Check(PlanQuestionsParamsSchema, { questions: [singleChoice, multipleChoice] })).toBe(
       true,
     );
   });
@@ -42,23 +38,20 @@ describe("plan question schema", () => {
     expect(Check(PlanQuestionsParamsSchema, { questions: [withoutType] })).toBe(false);
   });
 
-  test("rejects options on question types that must not have them", () => {
-    expect(
-      Check(PlanQuestionsParamsSchema, {
-        questions: [{ ...yesNo, options: [option("A"), option("B")] }],
-      }),
-    ).toBe(false);
-    expect(
-      Check(PlanQuestionsParamsSchema, {
-        questions: [{ ...essay, options: [option("A"), option("B")] }],
-      }),
-    ).toBe(false);
+  test("rejects removed and unknown question types", () => {
+    for (const type of ["yes_no", "essay", "unknown"]) {
+      expect(
+        Check(PlanQuestionsParamsSchema, {
+          questions: [{ id: "q", header: "Header", question: "Prompt", type }],
+        }),
+      ).toBe(false);
+    }
   });
 
   test("rejects unknown extra properties", () => {
-    expect(Check(PlanQuestionsParamsSchema, { questions: [{ ...yesNo, extra: "nope" }] })).toBe(
-      false,
-    );
+    expect(
+      Check(PlanQuestionsParamsSchema, { questions: [{ ...singleChoice, extra: "nope" }] }),
+    ).toBe(false);
   });
 
   test("rejects option counts outside 2-4", () => {
@@ -98,7 +91,9 @@ describe("normalizeQuestions", () => {
   });
 
   test("rejects duplicate question ids", () => {
-    expect(normalizeQuestions([singleChoice, { ...yesNo, id: singleChoice.id }])).toBeUndefined();
+    expect(
+      normalizeQuestions([singleChoice, { ...multipleChoice, id: singleChoice.id }]),
+    ).toBeUndefined();
   });
 
   test("rejects duplicate option labels case-insensitively", () => {
@@ -114,10 +109,5 @@ describe("normalizeQuestions", () => {
     expect(
       normalizeQuestions([{ ...singleChoice, options: [option("other"), option("B")] }]),
     ).toBeUndefined();
-  });
-
-  test("accepts yes_no and essay questions without options", () => {
-    const normalized = normalizeQuestions([yesNo, essay]);
-    expect(normalized).toHaveLength(2);
   });
 });

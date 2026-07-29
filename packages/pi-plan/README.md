@@ -38,14 +38,11 @@ Planning options include inherited settings, models allowed by Pi's `enabledMode
 `plan_mode_question` asks one to three structured questions. Each question declares an explicit `type`:
 
 - `single_choice` / `multiple_choice` — require 2 to 4 `{ label, impact }` options. A synthetic "Other" choice is always added; option labels may not collide with it (case-insensitively).
-- `yes_no` — presents a fixed Yes/No choice; no options and no "Other".
-- `essay` — opens Pi's built-in multiline editor; no options and no "Other".
 
 Keyboard controls:
 
-- **Single Choice / Yes-No**: ↑↓ choose, ←→ move between questions, Enter submit, Esc/Ctrl+C cancel.
+- **Single Choice**: ↑↓ choose, ←→ move between questions, Enter submit, Esc/Ctrl+C cancel.
 - **Multiple Choice**: ↑↓ move, Space toggle, Enter submit (at least one selection required), ←→ move between questions, Esc/Ctrl+C cancel.
-- **Essay**: ←→ move between questions, Enter opens the multiline editor, Esc/Ctrl+C cancel.
 
 Choosing "Other" (Single/Multiple Choice) opens a text prompt; cancelling that prompt returns to the question instead of cancelling the batch, and deselecting/reselecting "Other" lets the value be changed. Navigating back to an already-answered question restores its prior answer.
 
@@ -54,11 +51,9 @@ Answers are returned in question order, one per question, as a typed union:
 ```json
 { "id": "...", "type": "single_choice", "label": "...", "other": "optional custom text" }
 { "id": "...", "type": "multiple_choice", "labels": ["...", "Other"], "other": "optional custom text" }
-{ "id": "...", "type": "yes_no", "answer": true }
-{ "id": "...", "type": "essay", "text": "..." }
 ```
 
-Cancelling any question, submitting an empty custom/essay answer, or a Plan-mode cycle change while a question is open returns `{ "cancelled": true, "answers": [] }` with no partial answers.
+Cancelling any question, submitting an empty custom answer, or a Plan-mode cycle change while a question is open returns `{ "cancelled": true, "answers": [] }` with no partial answers.
 
 Global defaults live at `$PI_CODING_AGENT_DIR/pi-plan.json` (normally `~/.pi/agent/pi-plan.json`):
 
@@ -75,9 +70,9 @@ Invalid settings warn and fall back to inherited values without rewriting the fi
 
 Plans are archived under `$PI_CODING_AGENT_DIR/plans/`. Revisions overwrite the cycle's archive; new cycles create new files. Implementation and discard retain archives.
 
-Plan mode exposes only effective built-in inspection tools, a fail-closed restricted shell, structured questions, and structured completion. The structured Plan tools are visible to the model only while Plan mode is active; implementation, discard, off-state session restoration, and shutdown restore normal tools without them. It blocks writing tools, unknown/custom tools, shell expansion and redirection, mutating Git, installers, and unknown commands. This is risk reduction, not an OS sandbox: allowed builds and checks can still run project hooks or create ignored artifacts.
+Plan mode exposes only effective built-in inspection tools, a fail-closed restricted shell, structured questions, and structured completion. The structured Plan tools are visible to the model only while Plan mode is active; implementation, discard, off-state session restoration, and shutdown restore normal tools without them. It blocks writing tools, unknown/custom tools, shell expansion and redirection, mutating Git, installers, and unknown commands. RTK-wrapped commands receive the same read-only authorization checks as their effective commands. This is risk reduction, not an OS sandbox: allowed builds and checks can still run project hooks or create ignored artifacts.
 
-The clear-context implementation action writes a unique durable boundary and filters earlier conversation from subsequent model context. The visible session remains intact, and normal system/project instructions and tools remain available.
+The clear-context implementation action writes a unique durable boundary and filters earlier conversation from all subsequent model context, including later Plan-mode cycles. The visible session remains intact, and normal system/project instructions and tools remain available.
 
 The footer reports `plan` and `plan ready`. Ctrl+E is intercepted only while an archived plan is ready and Pi is idle; Pi's normal external prompt editor remains untouched at all other times. Invalid or failed archive edits restore the previous plan.
 

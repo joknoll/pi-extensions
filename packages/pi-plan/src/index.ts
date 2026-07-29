@@ -12,6 +12,7 @@ import {
   BOUNDARY_TYPE,
   DEFAULTS,
   INTERNAL_PLAN_TOOLS,
+  isInternalPlanTool,
   newCycle,
   offState,
   parseState,
@@ -50,7 +51,6 @@ import {
 
 const STATE_ENTRY = "pi-plan-state";
 const BUILTIN_PLAN_TOOLS = ["read", "grep", "find", "ls", "bash"];
-const INTERNAL_TOOLS: readonly string[] = INTERNAL_PLAN_TOOLS;
 const THINKING_LEVELS = [
   "inherit",
   "off",
@@ -166,7 +166,7 @@ export default function piPlan(pi: ExtensionAPI): void {
   }
 
   function isOwnInternalTool(tool: ReturnType<typeof pi.getAllTools>[number]): boolean {
-    if (!INTERNAL_TOOLS.includes(tool.name)) return false;
+    if (!isInternalPlanTool(tool.name)) return false;
     const path = tool.sourceInfo.path;
     return typeof path === "string" && !path.startsWith("<") && resolve(path) === EXTENSION_PATH;
   }
@@ -180,7 +180,7 @@ export default function piPlan(pi: ExtensionAPI): void {
           isOwnInternalTool(tool),
       )
       .map((tool) => tool.name);
-    const missing = [...BUILTIN_PLAN_TOOLS, ...INTERNAL_TOOLS].filter(
+    const missing = [...BUILTIN_PLAN_TOOLS, ...INTERNAL_PLAN_TOOLS].filter(
       (name) => !approved.includes(name),
     );
     const warning = missing.length > 0 ? missing.join(",") : undefined;
@@ -202,6 +202,7 @@ export default function piPlan(pi: ExtensionAPI): void {
   async function applyPlanning(ctx: ExtensionContext): Promise<void> {
     if (state.phase === "off") return;
     const cycle = state.cycle;
+    pi.setActiveTools(planningTools(ctx));
     const configured =
       cycle.planningModel === "inherit" ? undefined : findModel(ctx, cycle.planningModel);
     const configuredAvailable =
@@ -221,13 +222,18 @@ export default function piPlan(pi: ExtensionAPI): void {
         unavailableModelWarning = cycle.planningModel;
       }
     } else unavailableModelWarning = undefined;
-    if (selected) await pi.setModel(selected);
+    if (selected) {
+      try {
+        const activated = await pi.setModel(selected);
+        if (!activated) ctx.ui.notify("Could not activate planning model", "warning");
+      } catch (error) {
+        ctx.ui.notify(`Could not activate planning model: ${String(error)}`, "warning");
+      }
+    }
     const requested =
       cycle.planningThinking === "inherit" ? cycle.previousThinking : cycle.planningThinking;
     pi.setThinkingLevel(requested);
-    pi.setActiveTools(planningTools(ctx));
     setStatus(ctx);
-    persist();
   }
 
   async function restoreRuntime(ctx: ExtensionContext, cycle: PlanCycle): Promise<void> {
@@ -290,6 +296,7 @@ export default function piPlan(pi: ExtensionAPI): void {
     state.cycle.planningModel = next.model;
     state.cycle.planningThinking = next.thinkingLevel;
     await applyPlanning(ctx);
+    persist();
   }
 
   async function planningMenu(ctx: ExtensionContext): Promise<void> {
@@ -447,7 +454,7 @@ export default function piPlan(pi: ExtensionAPI): void {
     name: "plan_mode_question",
     label: "Plan clarification",
     description:
-      "Ask one to three structured material clarification questions. Each question is single_choice, multiple_choice, yes_no, or essay.",
+      "Ask one to three structured material clarification questions. Each question is single_choice or multiple_choice.",
     parameters: PlanQuestionsParamsSchema,
     async execute(_id, params, _signal, _update, ctx) {
       const cancelled = (): {
@@ -536,6 +543,7 @@ export default function piPlan(pi: ExtensionAPI): void {
           }),
         };
         await applyPlanning(ctx);
+        persist();
       } else if (state.phase === "ready") await readyMenu(ctx);
       else await planningMenu(ctx);
     },
@@ -559,7 +567,7 @@ export default function piPlan(pi: ExtensionAPI): void {
 
   pi.on("tool_call", (event, ctx) => {
     if (state.phase === "off") {
-      if (INTERNAL_TOOLS.includes(event.toolName))
+      if (isInternalPlanTool(event.toolName))
         return { block: true, reason: "Plan mode is not active" };
       return;
     }
@@ -647,6 +655,7 @@ export default function piPlan(pi: ExtensionAPI): void {
     editorOpen = false;
     completionReady = undefined;
     if (state.phase !== "off") await restoreRuntime(ctx, state.cycle);
+    deactivateInternalTools();
     ctx.ui.setStatus("plan-mode", undefined);
   });
 }

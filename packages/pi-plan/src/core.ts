@@ -141,9 +141,14 @@ export function planningPrompt(baseline?: string): string {
 
 export const BOUNDARY_TYPE = "pi-plan-implementation-boundary";
 export const INTERNAL_PLAN_TOOLS = ["plan_mode_question", "plan_mode_complete"] as const;
+const INTERNAL_PLAN_TOOL_SET = new Set<string>(INTERNAL_PLAN_TOOLS);
+
+export function isInternalPlanTool(name: string): boolean {
+  return INTERNAL_PLAN_TOOL_SET.has(name);
+}
 
 export function withoutInternalPlanTools(toolNames: readonly string[]): string[] {
-  return toolNames.filter((name) => !(INTERNAL_PLAN_TOOLS as readonly string[]).includes(name));
+  return toolNames.filter((name) => !isInternalPlanTool(name));
 }
 
 interface MessageLike {
@@ -181,12 +186,10 @@ function stripCompletion<T>(message: T): T | undefined {
 
 export function transformContext<T>(messages: readonly T[], planActive: boolean): T[] {
   let start = 0;
-  if (!planActive) {
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-      if (isBoundary(messages[index] as MessageLike)) {
-        start = index;
-        break;
-      }
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (isBoundary(messages[index] as MessageLike)) {
+      start = index;
+      break;
     }
   }
   const selected = messages.slice(start);
@@ -282,8 +285,12 @@ function tokenize(command: string): string[][] | string {
   return commands.some((words) => !words.length) ? "empty pipeline segment" : commands;
 }
 
-function validateWords(words: string[]): string | undefined {
+function validateWords(words: string[], rtkWrapped = false): string | undefined {
   const [command, ...args] = words;
+  if (command === "rtk") {
+    if (rtkWrapped || args.length === 0) return "bare or nested rtk commands are not allowed";
+    return validateWords(args, true);
+  }
   if (INSPECTION.has(command)) {
     if (args.some((arg) => FORBIDDEN.has(optionName(arg))))
       return `${command} option is not allowed`;
@@ -304,8 +311,9 @@ function validateWords(words: string[]): string | undefined {
     return undefined;
   }
   if (command === "git") {
-    if (args[0] !== "--no-pager") return "git must disable its pager with --no-pager";
-    const [subcommand, ...rest] = args.slice(1);
+    if (!rtkWrapped && args[0] !== "--no-pager")
+      return "git must disable its pager with --no-pager";
+    const [subcommand, ...rest] = rtkWrapped ? args : args.slice(1);
     if (!subcommand || !READ_ONLY_GIT.has(subcommand))
       return "only vetted read-only git subcommands are allowed";
     if (
@@ -314,7 +322,11 @@ function validateWords(words: string[]): string | undefined {
       )
     )
       return "git external helpers are not allowed";
-    if (["diff", "show", "log"].includes(subcommand) && !rest.includes("--no-ext-diff"))
+    if (
+      !rtkWrapped &&
+      ["diff", "show", "log"].includes(subcommand) &&
+      !rest.includes("--no-ext-diff")
+    )
       return `git ${subcommand} must include --no-ext-diff`;
     if (
       subcommand === "branch" &&

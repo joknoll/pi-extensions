@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
 import {
   BOUNDARY_TYPE,
+  isInternalPlanTool,
   newCycle,
   offState,
   parseState,
@@ -68,6 +69,12 @@ test("Plan interaction waits emit Herdr blocked state without direct socket code
 });
 
 describe("internal Plan tool filtering", () => {
+  test("recognizes the reserved tool names", () => {
+    expect(isInternalPlanTool("plan_mode_question")).toBe(true);
+    expect(isInternalPlanTool("plan_mode_complete")).toBe(true);
+    expect(isInternalPlanTool("read")).toBe(false);
+  });
+
   test("removes only internal tools while preserving order", () => {
     expect(
       withoutInternalPlanTools([
@@ -101,8 +108,20 @@ describe("strict shell policy", () => {
     ["uv lock --check", true],
     ["cargo test", true],
     ["go vet ./...", true],
+    ["rtk git status --short", true],
+    ["rtk git diff -- packages/pi-plan/src/core.ts", true],
+    ["rtk rg plan packages/pi-plan", true],
+    ["rtk cargo test", true],
     ["git status", false],
+    ["git --no-pager diff", false],
     ["git --no-pager checkout main", false],
+    ["rtk", false],
+    ["rtk rtk git status", false],
+    ["rtk unknown inspect", false],
+    ["rtk git checkout main", false],
+    ["rtk git diff --ext-diff", false],
+    ["rtk rg --pre helper plan", false],
+    ["rtk vp check --fix", false],
     ["find . -delete", false],
     ["vp check --fix", false],
     ["cat file > copy", false],
@@ -150,7 +169,45 @@ test("filters from the latest valid implementation boundary", () => {
     { role: "assistant", content: [{ type: "text", text: "new" }] },
   ];
   expect(transformContext(messages, false)).toEqual(messages.slice(4));
-  expect(transformContext(messages, true)).toEqual(messages);
+  expect(transformContext(messages, true)).toEqual(messages.slice(4));
+});
+
+test("strips stale completion interactions after selecting the latest boundary while off", () => {
+  const boundary = {
+    role: "custom",
+    customType: BOUNDARY_TYPE,
+    details: { version: 1 },
+    content: "implement",
+  };
+  const messages = [
+    { role: "user", content: "old" },
+    boundary,
+    {
+      role: "assistant",
+      content: [
+        { type: "text", text: "keep" },
+        { type: "toolCall", name: "plan_mode_complete" },
+      ],
+    },
+    { role: "toolResult", toolName: "plan_mode_complete", content: "stale" },
+  ];
+  expect(transformContext(messages, false)).toEqual([
+    boundary,
+    { role: "assistant", content: [{ type: "text", text: "keep" }] },
+  ]);
+  expect(transformContext(messages, true)).toEqual(messages.slice(1));
+});
+
+test("runtime application is fail-closed and does not persist unchanged state", async () => {
+  const index = await readFile(new URL("index.ts", import.meta.url), "utf8");
+  const applyStart = index.indexOf("async function applyPlanning");
+  const applyEnd = index.indexOf("async function restoreRuntime", applyStart);
+  const applyPlanning = index.slice(applyStart, applyEnd);
+  expect(applyPlanning.indexOf("pi.setActiveTools")).toBeLessThan(
+    applyPlanning.indexOf("await pi.setModel"),
+  );
+  expect(applyPlanning).not.toContain("persist();");
+  expect(index.match(/await applyPlanning\(ctx\);\n\s+persist\(\);/g)).toHaveLength(2);
 });
 
 test("keeps archives contained, replaces atomically, and restores invalid edits", async () => {
