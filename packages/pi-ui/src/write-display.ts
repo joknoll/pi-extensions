@@ -1,23 +1,35 @@
+import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, relative, resolve } from "node:path";
 import {
   createWriteTool,
   generateDiffString,
+  generateUnifiedPatch,
   keyHint,
   renderDiff,
   type ExtensionAPI,
   type WriteToolInput,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
-import { Box, Spacer, Text } from "@earendil-works/pi-tui";
+import {
+  Box,
+  Container,
+  Spacer,
+  Text,
+  truncateToWidth,
+  type Component,
+  visibleWidth,
+} from "@earendil-works/pi-tui";
 
 const COLLAPSED_DIFF_LINES = 16;
 const DIFF_CONTEXT_LINES = 3;
+const MIN_SPLIT_WIDTH = 88;
 
 interface WriteDiffDetails {
   diff: string;
   existed: boolean;
+  patch: string;
 }
 
 interface WritePreview extends WriteDiffDetails {
@@ -36,6 +48,7 @@ interface WriteCallComponent extends Box {
   previewPending: boolean;
   settled: boolean;
   settledError: boolean;
+  delta?: { argsKey: string; renderer: DeltaDiff };
 }
 
 function isMissingFile(error: unknown): boolean {
@@ -109,20 +122,192 @@ function setPreview(
   return changed;
 }
 
-function renderDiffPreview(diff: string, expanded: boolean): { text: string; hiddenLines: number } {
-  const lines = diff.split("\n");
-  const visibleLines = expanded ? lines : lines.slice(0, COLLAPSED_DIFF_LINES);
-  return {
-    text: renderDiff(visibleLines.join("\n")),
-    hiddenLines: lines.length - visibleLines.length,
-  };
+type DiffKind = "add" | "context" | "remove";
+
+interface DiffLine {
+  content: string;
+  kind: DiffKind;
+  lineNumber: string;
+}
+
+interface DiffRow {
+  left?: DiffLine;
+  right?: DiffLine;
+}
+
+function parseDiffLines(diff: string): DiffLine[] {
+  return diff
+    .split("\n")
+    .map((line) => {
+      const match = /^([ +-])\s*(\d+)\s(.*)$/.exec(line);
+      if (!match) return undefined;
+      return {
+        kind: match[1] === "+" ? "add" : match[1] === "-" ? "remove" : "context",
+        lineNumber: match[2],
+        content: match[3],
+      };
+    })
+    .filter((line): line is DiffLine => line !== undefined);
+}
+
+function buildSplitRows(lines: DiffLine[]): DiffRow[] {
+  const rows: DiffRow[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index];
+    if (!line) break;
+
+    if (line.kind === "remove") {
+      const removed: DiffLine[] = [];
+      while (lines[index]?.kind === "remove") removed.push(lines[index++]!);
+      const added: DiffLine[] = [];
+      while (lines[index]?.kind === "add") added.push(lines[index++]!);
+      for (let pair = 0; pair < Math.max(removed.length, added.length); pair++) {
+        rows.push({ left: removed[pair], right: added[pair] });
+      }
+      continue;
+    }
+
+    rows.push(line.kind === "add" ? { right: line } : { left: line, right: line });
+    index++;
+  }
+
+  return rows;
+}
+
+function padCell(text: string, width: number): string {
+  const fitted = truncateToWidth(text, width);
+  return `${fitted}${" ".repeat(Math.max(0, width - visibleWidth(fitted)))}`;
+}
+
+async function renderDelta(patch: string, width: number): Promise<string[]> {
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(
+      "delta",
+      ["--side-by-side", "--line-numbers", `--width=${width}`, "--paging=never"],
+      { stdio: ["pipe", "pipe", "pipe"] },
+    );
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    const timeout = setTimeout(() => child.kill(), 2_000);
+    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
+    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+    child.on("error", reject);
+    child.on("close", (code) => {
+      clearTimeout(timeout);
+      if (code === 0) {
+        resolvePromise(Buffer.concat(stdout).toString("utf8").replace(/\n$/, "").split("\n"));
+      } else {
+        reject(new Error(Buffer.concat(stderr).toString("utf8").trim() || "delta failed"));
+      }
+    });
+    child.stdin.end(patch);
+  });
+}
+
+class DeltaDiff implements Component {
+  private readonly cached = new Map<string, string[]>();
+  private readonly pending = new Set<string>();
+
+  constructor(
+    private readonly patch: string,
+    private readonly fallback: SplitDiff,
+    private readonly invalidateRow: () => void,
+  ) {}
+
+  invalidate(): void {}
+
+  render(width: number): string[] {
+    const key = `${width}:${this.fallback.expanded}`;
+    const cached = this.cached.get(key);
+    if (cached) return cached.map((line) => truncateToWidth(line, width));
+
+    if (!this.pending.has(key)) {
+      this.pending.add(key);
+      void renderDelta(this.patch, width)
+        .then((lines) => {
+          this.cached.set(key, lines);
+          this.invalidateRow();
+        })
+        .catch(() => undefined)
+        .finally(() => this.pending.delete(key));
+    }
+    return this.fallback.render(width);
+  }
+}
+
+class SplitDiff implements Component {
+  constructor(
+    private readonly diff: string,
+    readonly expanded: boolean,
+    private readonly theme: Theme,
+  ) {}
+
+  invalidate(): void {}
+
+  render(width: number): string[] {
+    if (width < MIN_SPLIT_WIDTH) return this.renderUnified(width);
+
+    const rows = buildSplitRows(parseDiffLines(this.diff));
+    const visibleRows = this.expanded ? rows : rows.slice(0, COLLAPSED_DIFF_LINES);
+    const hiddenRows = rows.length - visibleRows.length;
+    const numberWidth = Math.max(
+      3,
+      ...rows
+        .flatMap((row) => [row.left, row.right])
+        .flatMap((line) => (line ? [line.lineNumber.length] : [])),
+    );
+    const separator = " │ ";
+    const columnWidth = Math.floor((width - visibleWidth(separator)) / 2);
+    const renderCell = (line: DiffLine | undefined, side: "left" | "right"): string => {
+      if (!line) return " ".repeat(columnWidth);
+      const isChange = line.kind === (side === "left" ? "remove" : "add");
+      const color = isChange
+        ? line.kind === "add"
+          ? "toolDiffAdded"
+          : "toolDiffRemoved"
+        : "toolDiffContext";
+      const number = line.lineNumber.padStart(numberWidth, " ");
+      return padCell(this.theme.fg(color, `${number} │ ${line.content}`), columnWidth);
+    };
+
+    const header = (label: string) =>
+      padCell(this.theme.fg("muted", `${label.padStart(numberWidth, " ")} │`), columnWidth);
+    const rendered = [
+      `${header("old")}${this.theme.fg("dim", separator)}${header("new")}`,
+      `${this.theme.fg("dim", "─".repeat(columnWidth))}${this.theme.fg("dim", "─┼─")}${this.theme.fg("dim", "─".repeat(columnWidth))}`,
+      ...visibleRows.map(
+        (row) =>
+          `${renderCell(row.left, "left")}${this.theme.fg("dim", separator)}${renderCell(row.right, "right")}`,
+      ),
+    ];
+    if (hiddenRows > 0) {
+      rendered.push(
+        `${this.theme.fg("muted", `… ${hiddenRows} more diff rows,`)} ${keyHint("app.tools.expand", "to expand")}`,
+      );
+    }
+    return rendered.map((line) => truncateToWidth(line, width));
+  }
+
+  private renderUnified(width: number): string[] {
+    const lines = this.diff.split("\n");
+    const visibleLines = this.expanded ? lines : lines.slice(0, COLLAPSED_DIFF_LINES);
+    const rendered = renderDiff(visibleLines.join("\n")).split("\n");
+    if (lines.length > visibleLines.length) {
+      rendered.push(
+        `${this.theme.fg("muted", `… ${lines.length - visibleLines.length} more diff lines,`)} ${keyHint("app.tools.expand", "to expand")}`,
+      );
+    }
+    return rendered.map((line) => truncateToWidth(line, width));
+  }
 }
 
 function buildWriteCall(
   component: WriteCallComponent,
   args: WriteToolInput,
   theme: Theme,
-  context: Pick<WriteRenderContext, "cwd" | "expanded" | "isError">,
+  context: Pick<WriteRenderContext, "cwd" | "expanded" | "isError"> & { invalidate: () => void },
 ): WriteCallComponent {
   const writeArgs = getWriteArgs(args);
   const preview = component.preview;
@@ -154,20 +339,18 @@ function buildWriteCall(
   component.addChild(new Spacer(1));
   component.addChild(new Text(summary, 0, 0));
 
-  const rendered = renderDiffPreview(preview.diff, context.expanded);
-  if (rendered.text) {
-    component.addChild(new Spacer(1));
-    component.addChild(new Text(rendered.text, 0, 0));
-  }
-  if (rendered.hiddenLines > 0) {
-    component.addChild(
-      new Text(
-        `${theme.fg("muted", `… ${rendered.hiddenLines} more diff lines,`)} ${keyHint("app.tools.expand", "to expand")}`,
-        0,
-        0,
+  if (component.delta?.argsKey !== preview.argsKey) {
+    component.delta = {
+      argsKey: preview.argsKey,
+      renderer: new DeltaDiff(
+        preview.patch,
+        new SplitDiff(preview.diff, context.expanded, theme),
+        context.invalidate,
       ),
-    );
+    };
   }
+  component.addChild(new Spacer(1));
+  component.addChild(component.delta.renderer);
 
   return component;
 }
@@ -193,6 +376,12 @@ export function registerWriteDisplay(pi: ExtensionAPI): void {
         details: {
           diff: generateDiffString(previous.content, params.content, DIFF_CONTEXT_LINES).diff,
           existed: previous.existed,
+          patch: generateUnifiedPatch(
+            params.path,
+            previous.content,
+            params.content,
+            DIFF_CONTEXT_LINES,
+          ),
         } satisfies WriteDiffDetails,
       };
     },
@@ -234,7 +423,13 @@ export function registerWriteDisplay(pi: ExtensionAPI): void {
             writeArgs.content,
             DIFF_CONTEXT_LINES,
           ).diff;
-          if (setPreview(component, { argsKey, diff, existed: previous.existed }, argsKey)) {
+          const patch = generateUnifiedPatch(
+            writeArgs.path,
+            previous.content,
+            writeArgs.content,
+            DIFF_CONTEXT_LINES,
+          );
+          if (setPreview(component, { argsKey, diff, patch, existed: previous.existed }, argsKey)) {
             context.invalidate();
           }
         });
@@ -255,10 +450,10 @@ export function registerWriteDisplay(pi: ExtensionAPI): void {
         if (!context.isError && details && argsKey) {
           setPreview(component, { argsKey, ...details }, argsKey);
         }
-        return buildWriteCall(component, context.args, theme, context);
+        buildWriteCall(component, context.args, theme, context);
       }
 
-      return new Text("", 0, 0);
+      return new Container();
     },
   });
 }
