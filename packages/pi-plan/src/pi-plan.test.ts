@@ -2,8 +2,69 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
-import { BOUNDARY_TYPE, parseState, transformContext, validState, validateShell } from "./core.ts";
-import { acceptEditedArchive, isArchivePath, writePlanArchive } from "./storage.ts";
+import {
+  BOUNDARY_TYPE,
+  newCycle,
+  offState,
+  parseState,
+  transformContext,
+  validState,
+  validateShell,
+  type PlanState,
+} from "./core.ts";
+import { completePlan } from "./index.ts";
+import { acceptEditedArchive, isArchivePath, MAX_PLAN_SIZE, writePlanArchive } from "./storage.ts";
+
+function planningState(): PlanState {
+  return {
+    kind: "pi-plan-state",
+    version: 2,
+    phase: "planning",
+    cycle: newCycle({
+      previousTools: ["read"],
+      previousThinking: "high",
+      planningModel: "inherit",
+      planningThinking: "inherit",
+    }),
+  };
+}
+
+describe("plan completion", () => {
+  test("archives the plan, stores ready state, and terminates the agent turn", async () => {
+    const archived: string[] = [];
+    const completion = await completePlan(planningState(), "  # Ready plan  ", async (plan) => {
+      archived.push(plan);
+      return "/archive/ready.md";
+    });
+
+    expect(archived).toEqual(["# Ready plan"]);
+    expect(completion.state).toMatchObject({
+      phase: "ready",
+      cycle: { plan: "# Ready plan", archivePath: "/archive/ready.md", revision: 1 },
+    });
+    expect(completion.result.terminate).toBe(true);
+    expect(completion.result).not.toHaveProperty("isError");
+  });
+
+  test.each([
+    ["inactive", offState(), "# Plan", undefined],
+    ["empty", planningState(), "   ", undefined],
+    ["oversized", planningState(), "x".repeat(MAX_PLAN_SIZE + 1), undefined],
+    ["archive failure", planningState(), "# Plan", async () => Promise.reject(new Error("disk"))],
+  ])("rejects %s completion without terminating", async (_name, state, plan, archive) => {
+    const completion = await completePlan(state, plan, archive);
+    expect(completion.state).toBe(state);
+    expect(completion.result.isError).toBe(true);
+    expect(completion.result).not.toHaveProperty("terminate");
+  });
+});
+
+test("Plan interaction waits emit Herdr blocked state without direct socket code", async () => {
+  const index = await readFile(new URL("index.ts", import.meta.url), "utf8");
+  expect(index).toContain('pi.events.emit("herdr:blocked", { active: true, label })');
+  expect(index).toContain('pi.events.emit("herdr:blocked", { active: false, label })');
+  expect(index).not.toContain("HERDR_SOCKET_PATH");
+});
 
 describe("strict shell policy", () => {
   const cases: Array<[string, boolean]> = [

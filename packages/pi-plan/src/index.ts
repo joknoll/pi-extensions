@@ -69,6 +69,55 @@ function completionNonce(cycle: PlanCycle): string {
   return `${cycle.id}:${cycle.revision}`;
 }
 
+type CompletionResult = {
+  content: [{ type: "text"; text: string }];
+  details: { version: 1; plan: string; revision: number };
+  isError?: true;
+  terminate?: true;
+};
+
+/** Builds a completion result without depending on Pi's TUI or lifecycle. */
+export async function completePlan(
+  state: PlanState,
+  submittedPlan: string,
+  archive: (plan: string, existing?: string) => Promise<string> = writePlanArchive,
+): Promise<{ state: PlanState; result: CompletionResult }> {
+  const error = (message: string): { state: PlanState; result: CompletionResult } => ({
+    state,
+    result: {
+      content: [{ type: "text", text: message }],
+      details: { version: 1, plan: "", revision: -1 },
+      isError: true,
+    },
+  });
+  if (state.phase !== "planning") return error("Plan mode is not accepting a completion");
+  const plan = submittedPlan.trim();
+  if (!plan) return error("Plan is empty");
+  if (plan.length > MAX_PLAN_SIZE) return error("Plan exceeds the size limit");
+
+  let archivePath: string;
+  try {
+    archivePath = await archive(plan, state.cycle.archivePath);
+  } catch (archiveError) {
+    return error(`Could not archive plan: ${String(archiveError)}`);
+  }
+  const cycle = { ...state.cycle, plan, archivePath, revision: state.cycle.revision + 1 };
+  const readyState: PlanState = {
+    kind: "pi-plan-state",
+    version: 2,
+    phase: "ready",
+    cycle,
+  };
+  return {
+    state: readyState,
+    result: {
+      content: [{ type: "text", text: plan }],
+      details: { version: 1, plan, revision: cycle.revision },
+      terminate: true,
+    },
+  };
+}
+
 export default function piPlan(pi: ExtensionAPI): void {
   let state: PlanState = offState();
   let preferences: Preferences = DEFAULTS;
@@ -81,6 +130,14 @@ export default function piPlan(pi: ExtensionAPI): void {
   let unavailableToolsWarning: string | undefined;
 
   const persist = () => pi.appendEntry(STATE_ENTRY, state);
+  const withBlockedIndicator = async <T>(label: string, action: () => Promise<T>): Promise<T> => {
+    pi.events.emit("herdr:blocked", { active: true, label });
+    try {
+      return await action();
+    } finally {
+      pi.events.emit("herdr:blocked", { active: false, label });
+    }
+  };
   const setStatus = (ctx: ExtensionContext) =>
     ctx.ui.setStatus(
       "plan-mode",
@@ -279,7 +336,7 @@ export default function piPlan(pi: ExtensionAPI): void {
             display: true,
             details: { version: 1, cycleId: cycle.id, revision: cycle.revision },
           },
-          { deliverAs: "nextTurn" },
+          { triggerTurn: true, deliverAs: "nextTurn" },
         );
       } else pi.sendUserMessage(`Implement the following approved plan:\n\n${plan}`);
     } catch (error) {
@@ -329,10 +386,13 @@ export default function piPlan(pi: ExtensionAPI): void {
       return;
     }
     const nonce = completionNonce(state.cycle);
+    const archivePath = state.cycle.archivePath;
     menuOpen = true;
     let intent: ReadyIntent | undefined;
     try {
-      intent = await showReadyMenu(ctx, state.cycle.archivePath);
+      intent = await withBlockedIndicator("Plan ready action", () =>
+        showReadyMenu(ctx, archivePath),
+      );
     } finally {
       menuOpen = false;
     }
@@ -381,12 +441,8 @@ export default function piPlan(pi: ExtensionAPI): void {
       let questionIndex = 0;
       while (questionIndex < questions.length) {
         const question = questions[questionIndex];
-        const outcome = await showPlanQuestion(
-          ctx,
-          question,
-          answers[questionIndex],
-          questionIndex,
-          questions.length,
+        const outcome = await withBlockedIndicator("Plan clarification", () =>
+          showPlanQuestion(ctx, question, answers[questionIndex], questionIndex, questions.length),
         );
         if (!outcome || currentCycleId() !== expectedCycle) return cancelled();
         if (outcome === "previous") {
@@ -417,39 +473,14 @@ export default function piPlan(pi: ExtensionAPI): void {
       { additionalProperties: false },
     ),
     async execute(_id, params, _signal, _update, ctx) {
-      const error = (message: string) => ({
-        content: [{ type: "text" as const, text: message }],
-        details: { version: 1, plan: "", revision: -1 },
-        isError: true,
-      });
-      if (state.phase !== "planning") return error("Plan mode is not accepting a completion");
-      const plan = params.plan.trim();
-      if (!plan) return error("Plan is empty");
-      if (plan.length > MAX_PLAN_SIZE) return error("Plan exceeds the size limit");
-      const cycle = state.cycle;
-      let archivePath: string;
-      try {
-        archivePath = await writePlanArchive(plan, cycle.archivePath);
-      } catch (archiveError) {
-        return error(`Could not archive plan: ${String(archiveError)}`);
-      }
-      cycle.plan = plan;
-      cycle.archivePath = archivePath;
-      cycle.revision += 1;
-      state = {
-        kind: "pi-plan-state",
-        version: 2,
-        phase: "ready",
-        cycle: cycle as PlanCycle & { plan: string; archivePath: string },
-      };
-      completionReady = completionNonce(cycle);
+      const completion = await completePlan(state, params.plan);
+      if (completion.result.isError || completion.state.phase !== "ready") return completion.result;
+      const readyState = completion.state;
+      state = readyState;
+      completionReady = completionNonce(readyState.cycle);
       setStatus(ctx);
       persist();
-      return {
-        content: [{ type: "text" as const, text: plan }],
-        details: { version: 1, plan, revision: cycle.revision },
-        terminate: true,
-      };
+      return completion.result;
     },
   });
 

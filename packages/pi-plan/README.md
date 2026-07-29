@@ -81,6 +81,18 @@ The clear-context implementation action writes a unique durable boundary and fil
 
 The footer reports `plan` and `plan ready`. Ctrl+E is intercepted only while an archived plan is ready and Pi is idle; Pi's normal external prompt editor remains untouched at all other times. Invalid or failed archive edits restore the previous plan.
 
+## Herdr integration
+
+Install Herdr's Pi integration before launching Pi:
+
+```sh
+herdr integration install pi
+```
+
+Pi must run inside a Herdr-managed pane with `HERDR_ENV=1`, `HERDR_PANE_ID`, and `HERDR_SOCKET_PATH` in its environment. The integration maps Pi's normal `agent_start` and `agent_end` lifecycle to Herdr `working → idle`; Herdr derives the blue `done` indicator when that idle pane is in the background and unseen. A focused completed pane remains seen/idle.
+
+Successful `plan_mode_complete` calls terminate the agent turn, producing `agent_end`. While clarification dialogs and the Plan-ready action menu await input, Pi Plan emits `herdr:blocked`, which the installed integration maps to Herdr's red blocked indicator; closing or cancelling the interaction clears it. Planning options and the ordinary Plan-mode menu do not report blocked. Pi Plan contains no direct Herdr socket code or dependency: Herdr owns delivery retries, session identity, sequencing, and state arbitration. Without the integration, Plan mode still works normally, but Herdr's limited screen heuristic may not reliably show these states.
+
 ## Development
 
 ```sh
