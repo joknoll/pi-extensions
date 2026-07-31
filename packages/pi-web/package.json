@@ -1,0 +1,62 @@
+{
+  "name": "@joknoll/pi-web",
+  "version": "0.0.0",
+  "description": "Static web fetching and readable content extraction for Pi.",
+  "keywords": [
+    "coding-agent",
+    "pi-extension",
+    "pi-package",
+    "web",
+    "web-fetch"
+  ],
+  "homepage": "https://github.com/joknoll/pi-extensions#readme",
+  "bugs": {
+    "url": "https://github.com/joknoll/pi-extensions/issues"
+  },
+  "license": "MIT",
+  "author": "Johannes Knoll <git@joknoll.de>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joknoll/pi-extensions.git",
+    "directory": "packages/pi-web"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "test": "vp test run",
+    "prepublishOnly": "vp run build"
+  },
+  "dependencies": {
+    "@mozilla/readability": "catalog:",
+    "linkedom": "catalog:",
+    "turndown": "catalog:"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "catalog:",
+    "@types/node": "catalog:",
+    "@types/turndown": "catalog:",
+    "typebox": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.mjs"
+    ]
+  }
+}

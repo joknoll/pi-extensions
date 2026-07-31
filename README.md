@@ -16,6 +16,7 @@ Each package provides one feature and keeps its configuration separate.
 | [`@joknoll/pi-plan`](packages/pi-plan)                           | Strict, keyboard-controlled plan mode for Pi.                 |
 | [`@joknoll/pi-rtk`](packages/pi-rtk)                             | Pi integration for RTK command rewriting.                     |
 | [`@joknoll/pi-ui`](packages/pi-ui)                               | Custom Pi interface features, except the footer.              |
+| [`@joknoll/pi-web`](packages/pi-web)                             | Static web fetching and readable content extraction for Pi.   |
 
 Open a package README for its requirements, commands, and configuration.
 
