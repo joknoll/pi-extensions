@@ -1,84 +1,57 @@
-# @joknoll's Pi Coding Agent config
+# Pi Coding Agent Extensions
 
-At its core, a coding harness manages three things: context, tools, and the orchestration between LLMs and the developer.
+A collection of focused extensions for [Pi](https://pi.dev).
 
-## Context
+Each package provides one feature and keeps its configuration separate.
 
-The goal of the context layer is to maximize the relevance of information the model sees while minimizing token bloat and noise.
+## Packages
 
-### Directives & Enrichment (Adding Signal)
+| Package                                                          | Description                                                   |
+| ---------------------------------------------------------------- | ------------------------------------------------------------- |
+| [`@joknoll/pi-cache`](packages/pi-cache)                         | Session prompt cache metrics for Pi.                          |
+| [`@joknoll/pi-compact`](packages/pi-compact)                     | Review and editing for Pi compaction checkpoints.             |
+| [`@joknoll/pi-footer`](packages/pi-footer)                       | Compact footer with Starship support for Pi.                  |
+| [`@joknoll/pi-git-meta`](packages/pi-git-meta)                   | Immutable Pi agent provenance records stored with `git-meta`. |
+| [`@joknoll/pi-interactive-shell`](packages/pi-interactive-shell) | Bash and Nushell command completion for Pi shell commands.    |
+| [`@joknoll/pi-plan`](packages/pi-plan)                           | Strict, keyboard-controlled plan mode for Pi.                 |
+| [`@joknoll/pi-rtk`](packages/pi-rtk)                             | Pi integration for RTK command rewriting.                     |
+| [`@joknoll/pi-ui`](packages/pi-ui)                               | Custom Pi interface features, except the footer.              |
 
-- System Prompt & AGENTS.md
-  - Static rules defining the model's persona and constraints.
-- Skills
-  - On-demand domain knowledge and framework documentation.
-- Memory
-  - Persistent vector storage to recall architectural decisions across sessions.
+Open a package README for its requirements, commands, and configuration.
 
-### Compaction & Optimization (Removing Noise)
+## Install
 
-- rtk-optimizer
-  - Cleans and condenses verbose CLI outputs
-- lean-ctx https://pi.dev/packages/pi-lean-ctx
-  - Caches redundant file reads into tiny token stubs
-- Pruning / AST
-  - Feeds lightweight structural blueprints of the codebase instead of full files.
+Install a package through Pi:
 
-Utilities like lean-ctx and AST parsers are executed as callable **tools**, but they belong under Context because their sole purpose is optimizing what the model reads.
+```sh
+pi install npm:@joknoll/pi-plan
+```
 
-## Tools
+Replace `pi-plan` with the required package name.
 
-Tools give the model primitives to edit code, navigate files, and query systems.
+## Development
 
-### Core Execution
+Install the workspace dependencies:
 
-- File & Shell
-  - The baseline abilities to `read`, `write`, `edit`, and execute `bash`.
+```sh
+vp install
+```
 
-### Search & Navigation
+Run all checks, tests, and builds:
 
-- rg
-- fd
-- tilth
-- codegraph
-- Patch Tool
+```sh
+vp run ready
+```
 
-### Specialized Capabilities
+Run a package script from its package directory:
 
-- chrome-devtools https://pi.dev/packages/@narumitw/pi-chrome-devtools
-  - manipulate the DOM, inspect networks, and read visual feedback
-- pi-simplify https://pi.dev/packages/pi-simplify
-  - reviewer that refactors recently modified code for readability
+```sh
+vp test run
+vp pack
+```
 
-## Orchestration
+## Architecture
 
-Orchestration routes tasks efficiently, enforces safety boundaries, and keeps the human in the loop.
+Read [`ARCHITECTURE.md`](ARCHITECTURE.md) for the coding harness design model.
 
-### Behavioral Modes
-
-- Plan / Architect
-  - Restricts tools to read-only while forcing the agent to output structured plans.
-- Implement
-  - Unlocks full writing and shell capabilities.
-- Research / Commit
-  - Specialized tool constraints for browsing the web or writing git commits.
-
-### Delegation & Isolation
-
-- Sub-agents
-  - Spawns isolated execution environments for sub-tasks to protect main context window
-
-https://pi.dev/packages/@minhduydev/pi-subagents
-
-### Workspace & UI Management
-
-- herdr
-  - multiplexer to spawn, view, and control multiple agents
-- worktrunk https://worktrunk.dev/
-  - Manage parallel git worktrees for multiple sub-agents
-
-- decorated-pi replaces pi's built-in @ autocomplete with a high-speed file finder backed by @ff-labs/fff-node— a Rust SIMD fuzzy file search engine with in-memory index, frecency ranking, and git status awareness. Pi's native provider shells out to fd on every keystroke.
-
-## Pi Extensions
-
-- [@ff-labs/pi-fff](https://pi.dev/packages/@ff-labs/pi-fff) for faster autocomplete and find/grep
+The document explains context, tools, orchestration, and their boundaries.

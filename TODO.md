@@ -35,3 +35,18 @@ similar to https://entire.io/
 - retry
 - fff
 - web search
+
+## herdr
+
+- herdr-collie (PWA)
+- herdr-worktrunk
+- trunkr
+
+- herdr-navigator
+- herdr-scratch
+- herdr-gitview
+- herdr-title
+- herdr-tab-title
+
+- herdr-board, herdr-kanban
+- heardr beads
