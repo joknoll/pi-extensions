@@ -3,11 +3,23 @@
   "version": "0.0.0",
   "description": "Personal UI customizations for Pi, excluding the footer.",
   "keywords": [
+    "coding-agent",
     "pi-extension",
     "pi-package",
-    "ui"
+    "terminal-ui",
+    "user-interface"
   ],
+  "homepage": "https://github.com/joknoll/pi-extensions#readme",
+  "bugs": {
+    "url": "https://github.com/joknoll/pi-extensions/issues"
+  },
   "license": "MIT",
+  "author": "Johannes Knoll <git@joknoll.de>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joknoll/pi-extensions.git",
+    "directory": "packages/pi-ui"
+  },
   "files": [
     "dist"
   ],
@@ -21,8 +33,6 @@
   },
   "scripts": {
     "build": "vp pack",
-    "dev": "vp pack --watch",
-    "check": "vp check",
     "test": "vp test run",
     "prepublishOnly": "vp run build"
   },

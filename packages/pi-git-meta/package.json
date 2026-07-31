@@ -2,7 +2,25 @@
   "name": "@joknoll/pi-git-meta",
   "version": "0.1.0",
   "description": "Immutable Pi agent provenance traces stored by git-meta.",
+  "keywords": [
+    "coding-agent",
+    "git",
+    "metadata",
+    "pi-extension",
+    "pi-package",
+    "provenance"
+  ],
+  "homepage": "https://github.com/joknoll/pi-extensions#readme",
+  "bugs": {
+    "url": "https://github.com/joknoll/pi-extensions/issues"
+  },
   "license": "MIT",
+  "author": "Johannes Knoll <git@joknoll.de>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joknoll/pi-extensions.git",
+    "directory": "packages/pi-git-meta"
+  },
   "files": [
     "dist",
     "scripts"
@@ -12,10 +30,11 @@
     ".": "./dist/index.mjs",
     "./package.json": "./package.json"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "vp pack",
-    "dev": "vp pack --watch",
-    "check": "vp check",
     "test": "vp test run",
     "prepublishOnly": "vp run build"
   },

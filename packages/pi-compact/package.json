@@ -3,12 +3,23 @@
   "version": "0.0.0",
   "description": "Reviewed, editable native compaction checkpoints for Pi.",
   "keywords": [
+    "coding-agent",
     "compaction",
     "context",
     "pi-extension",
     "pi-package"
   ],
+  "homepage": "https://github.com/joknoll/pi-extensions#readme",
+  "bugs": {
+    "url": "https://github.com/joknoll/pi-extensions/issues"
+  },
   "license": "MIT",
+  "author": "Johannes Knoll <git@joknoll.de>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joknoll/pi-extensions.git",
+    "directory": "packages/pi-compact"
+  },
   "files": [
     "dist"
   ],
@@ -22,9 +33,6 @@
   },
   "scripts": {
     "build": "vp pack",
-    "dev": "vp pack --watch",
-    "check": "vp check",
-    "test": "vp test run",
     "prepublishOnly": "vp run build"
   },
   "devDependencies": {
