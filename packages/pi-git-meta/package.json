@@ -38,13 +38,6 @@
     "test": "vp test run",
     "prepublishOnly": "vp run build"
   },
-  "devDependencies": {
-    "@earendil-works/pi-coding-agent": "catalog:",
-    "@types/node": "catalog:",
-    "typescript": "catalog:",
-    "vite": "catalog:",
-    "vite-plus": "catalog:"
-  },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
   },

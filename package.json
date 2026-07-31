@@ -1,17 +1,21 @@
 {
   "name": "@joknoll/pi-extensions",
   "version": "0.1.0",
-  "private": false,
+  "private": true,
   "type": "module",
   "scripts": {
     "ready": "vp check && vp run -r test && vp run -r build",
     "prepare": "vp config"
   },
-  "dependencies": {
-    "ts-syntax-highlighter": "catalog:"
-  },
   "devDependencies": {
-    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.6",
+    "@earendil-works/pi-ai": "catalog:",
+    "@earendil-works/pi-coding-agent": "catalog:",
+    "@earendil-works/pi-tui": "catalog:",
+    "@types/node": "catalog:",
+    "@types/turndown": "catalog:",
+    "typebox": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
     "vite-plus": "catalog:"
   },
   "devEngines": {

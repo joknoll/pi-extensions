@@ -41,15 +41,6 @@
     "linkedom": "catalog:",
     "turndown": "catalog:"
   },
-  "devDependencies": {
-    "@earendil-works/pi-coding-agent": "catalog:",
-    "@types/node": "catalog:",
-    "@types/turndown": "catalog:",
-    "typebox": "catalog:",
-    "typescript": "catalog:",
-    "vite": "catalog:",
-    "vite-plus": "catalog:"
-  },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
     "typebox": "*"

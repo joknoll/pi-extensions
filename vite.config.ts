@@ -1,10 +1,16 @@
 import { defineConfig } from "vite-plus";
 
 export default defineConfig({
+  pack: {
+    exports: true,
+    format: "esm",
+  },
   staged: {
     "*": "vp check --fix",
   },
-  fmt: {},
+  fmt: {
+    ignorePatterns: ["packages/*/dist/**"],
+  },
   lint: {
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: { "vite-plus/prefer-vite-plus-imports": "error" },
