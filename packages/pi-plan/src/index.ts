@@ -6,7 +6,7 @@ import {
   type ExtensionAPI,
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { matchesKey } from "@earendil-works/pi-tui";
+import { Container, matchesKey } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
   BOUNDARY_TYPE,
@@ -43,9 +43,11 @@ import {
 } from "./storage.ts";
 import {
   editArchivedPlan,
+  renderQuestionSummary,
   showPlanQuestion,
   showPlanSelect,
   showReadyMenu,
+  type QuestionSummaryComponent,
   type ReadyIntent,
 } from "./ui.ts";
 
@@ -450,12 +452,18 @@ export default function piPlan(pi: ExtensionAPI): void {
     });
   }
 
-  const questionTool = defineTool({
+  type QuestionRenderState = { callComponent?: QuestionSummaryComponent };
+  const questionTool = defineTool<
+    typeof PlanQuestionsParamsSchema,
+    PlanQuestionsResult,
+    QuestionRenderState
+  >({
     name: "plan_mode_question",
     label: "Plan clarification",
     description:
-      "Ask one to three structured material clarification questions. Each question is single_choice or multiple_choice.",
+      "Ask one to three structured material clarification questions. Each question is single_choice or multiple_choice. Use short option titles and one concise plain-language impact sentence per option.",
     parameters: PlanQuestionsParamsSchema,
+    renderShell: "self",
     async execute(_id, params, _signal, _update, ctx) {
       const cancelled = (): {
         content: [{ type: "text"; text: string }];
@@ -470,11 +478,23 @@ export default function piPlan(pi: ExtensionAPI): void {
       const expectedCycle = state.cycle.id;
       const currentCycleId = () => (state.phase === "off" ? undefined : state.cycle.id);
       const answers: Array<PlanAnswer | undefined> = Array.from({ length: questions.length });
+      const draftNotes: Array<string | undefined> = Array.from({ length: questions.length });
       let questionIndex = 0;
       while (questionIndex < questions.length) {
-        const question = questions[questionIndex];
+        const currentIndex = questionIndex;
+        const question = questions[currentIndex];
         const outcome = await withBlockedIndicator("Plan clarification", () =>
-          showPlanQuestion(ctx, question, answers[questionIndex], questionIndex, questions.length),
+          showPlanQuestion(
+            ctx,
+            question,
+            answers[currentIndex],
+            currentIndex,
+            questions.length,
+            draftNotes[currentIndex],
+            (note) => {
+              draftNotes[currentIndex] = note;
+            },
+          ),
         );
         if (!outcome || currentCycleId() !== expectedCycle) return cancelled();
         if (outcome === "previous") {
@@ -485,7 +505,8 @@ export default function piPlan(pi: ExtensionAPI): void {
           questionIndex = Math.min(questions.length - 1, questionIndex + 1);
           continue;
         }
-        answers[questionIndex] = outcome.answer;
+        answers[currentIndex] = outcome.answer;
+        draftNotes[currentIndex] = outcome.answer.note;
         const nextUnanswered = answers.findIndex((answer) => answer === undefined);
         if (nextUnanswered < 0) break;
         questionIndex = nextUnanswered;
@@ -493,6 +514,22 @@ export default function piPlan(pi: ExtensionAPI): void {
       if (answers.some((answer) => answer === undefined)) return cancelled();
       const result: PlanQuestionsResult = { cancelled: false, answers: answers as PlanAnswer[] };
       return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
+    },
+    renderCall(args, theme, context) {
+      const component =
+        (context.lastComponent as QuestionSummaryComponent | undefined) ??
+        context.state.callComponent ??
+        new Container();
+      context.state.callComponent = component;
+      return renderQuestionSummary(component, args.questions, undefined, theme);
+    },
+    renderResult(result, _options, theme, context) {
+      const component = context.state.callComponent;
+      if (component) {
+        renderQuestionSummary(component, context.args.questions, result.details, theme);
+        return new Container();
+      }
+      return renderQuestionSummary(new Container(), context.args.questions, result.details, theme);
     },
   });
 

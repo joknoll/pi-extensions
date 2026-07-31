@@ -49,9 +49,10 @@ Do not use an option label that matches `Other`, regardless of case.
 
 ### Keyboard controls
 
-- Use ↑↓ to select an option.
-- Use ←→ to move between questions.
+- Use ↑↓ or j/k to select an option.
+- Use ←→ or h/l to move between questions.
 - Use Space to toggle multiple choices.
+- Use n to add an optional note to the current question.
 - Use Enter to submit.
 - Use Esc or Ctrl+C to cancel.
 
@@ -64,8 +65,8 @@ The extension restores prior answers when you return to a question.
 Answers use a typed union:
 
 ```json
-{ "id": "...", "type": "single_choice", "label": "...", "other": "optional custom text" }
-{ "id": "...", "type": "multiple_choice", "labels": ["...", "Other"], "other": "optional custom text" }
+{ "id": "...", "type": "single_choice", "label": "...", "other": "optional custom text", "note": "optional note" }
+{ "id": "...", "type": "multiple_choice", "labels": ["...", "Other"], "other": "optional custom text", "note": "optional note" }
 ```
 
 A canceled question returns this result without partial answers:

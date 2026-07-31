@@ -4,8 +4,17 @@ export const OTHER_LABEL = "Other";
 
 const QuestionOptionSchema = Type.Object(
   {
-    label: Type.String({ minLength: 1, maxLength: 120 }),
-    impact: Type.String({ minLength: 1, maxLength: 300 }),
+    label: Type.String({
+      minLength: 1,
+      maxLength: 120,
+      description: "A short, distinct option title. Prefer two to five words.",
+    }),
+    impact: Type.String({
+      minLength: 1,
+      maxLength: 300,
+      description:
+        "One concise plain-language sentence that states the option's practical consequence. Prefer 100 characters or fewer.",
+    }),
   },
   { additionalProperties: false },
 );
@@ -55,12 +64,14 @@ export type SingleChoiceAnswer = {
   type: "single_choice";
   label: string;
   other?: string;
+  note?: string;
 };
 export type MultipleChoiceAnswer = {
   id: string;
   type: "multiple_choice";
   labels: string[];
   other?: string;
+  note?: string;
 };
 export type PlanAnswer = SingleChoiceAnswer | MultipleChoiceAnswer;
 export type PlanQuestionsResult = { cancelled: boolean; answers: PlanAnswer[] };
