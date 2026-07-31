@@ -132,8 +132,17 @@ export default function piPlan(pi: ExtensionAPI): void {
   let unsubscribeTerminal: (() => void) | undefined;
   let unavailableModelWarning: string | undefined;
   let unavailableToolsWarning: string | undefined;
+  let managedRuntimeDepth = 0;
 
   const persist = () => pi.appendEntry(STATE_ENTRY, state);
+  const withManagedRuntime = async <T>(action: () => Promise<T> | T): Promise<T> => {
+    managedRuntimeDepth += 1;
+    try {
+      return await action();
+    } finally {
+      managedRuntimeDepth -= 1;
+    }
+  };
   const withBlockedIndicator = async <T>(label: string, action: () => Promise<T>): Promise<T> => {
     pi.events.emit("herdr:blocked", { active: true, label });
     try {
@@ -214,7 +223,14 @@ export default function piPlan(pi: ExtensionAPI): void {
       );
     const fallback = findModel(ctx, cycle.previousModel);
     const fallbackAvailable = fallback && ctx.modelRegistry.hasConfiguredAuth(fallback);
-    const selected = configuredAvailable ? configured : fallbackAvailable ? fallback : undefined;
+    const selected =
+      cycle.planningModel === "inherit"
+        ? undefined
+        : configuredAvailable
+          ? configured
+          : fallbackAvailable
+            ? fallback
+            : undefined;
     if (cycle.planningModel !== "inherit" && !configuredAvailable) {
       if (unavailableModelWarning !== cycle.planningModel) {
         ctx.ui.notify(
@@ -224,37 +240,41 @@ export default function piPlan(pi: ExtensionAPI): void {
         unavailableModelWarning = cycle.planningModel;
       }
     } else unavailableModelWarning = undefined;
-    if (selected) {
-      try {
-        const activated = await pi.setModel(selected);
-        if (!activated) ctx.ui.notify("Could not activate planning model", "warning");
-      } catch (error) {
-        ctx.ui.notify(`Could not activate planning model: ${String(error)}`, "warning");
+    await withManagedRuntime(async () => {
+      if (selected && modelId(ctx.model) !== modelId(selected)) {
+        try {
+          const activated = await pi.setModel(selected);
+          if (!activated) ctx.ui.notify("Could not activate planning model", "warning");
+        } catch (error) {
+          ctx.ui.notify(`Could not activate planning model: ${String(error)}`, "warning");
+        }
       }
-    }
-    const requested =
-      cycle.planningThinking === "inherit" ? cycle.previousThinking : cycle.planningThinking;
-    pi.setThinkingLevel(requested);
+      if (cycle.planningThinking !== "inherit" && pi.getThinkingLevel() !== cycle.planningThinking)
+        pi.setThinkingLevel(cycle.planningThinking);
+    });
     setStatus(ctx);
   }
 
   async function restoreRuntime(ctx: ExtensionContext, cycle: PlanCycle): Promise<void> {
     const previous = findModel(ctx, cycle.previousModel);
-    if (previous && ctx.modelRegistry.hasConfiguredAuth(previous)) {
-      try {
-        await pi.setModel(previous);
-      } catch (error) {
+    await withManagedRuntime(async () => {
+      if (previous && ctx.modelRegistry.hasConfiguredAuth(previous)) {
+        try {
+          if (modelId(ctx.model) !== modelId(previous)) await pi.setModel(previous);
+        } catch (error) {
+          ctx.ui.notify(
+            `Could not restore model ${cycle.previousModel}: ${String(error)}`,
+            "warning",
+          );
+        }
+      } else if (cycle.previousModel)
         ctx.ui.notify(
-          `Could not restore model ${cycle.previousModel}: ${String(error)}`,
+          `Original model ${cycle.previousModel} is unavailable; retaining the current model`,
           "warning",
         );
-      }
-    } else if (cycle.previousModel)
-      ctx.ui.notify(
-        `Original model ${cycle.previousModel} is unavailable; retaining the current model`,
-        "warning",
-      );
-    pi.setThinkingLevel(cycle.previousThinking);
+      if (pi.getThinkingLevel() !== cycle.previousThinking)
+        pi.setThinkingLevel(cycle.previousThinking);
+    });
     const all = pi.getAllTools();
     const available = new Set(all.map((tool) => tool.name));
     const restored = withoutInternalPlanTools(cycle.previousTools).filter((name) =>
@@ -584,6 +604,18 @@ export default function piPlan(pi: ExtensionAPI): void {
       } else if (state.phase === "ready") await readyMenu(ctx);
       else await planningMenu(ctx);
     },
+  });
+
+  pi.on("model_select", (event) => {
+    if (managedRuntimeDepth > 0 || state.phase === "off" || event.source === "restore") return;
+    state.cycle.planningModel = modelId(event.model) ?? "inherit";
+    persist();
+  });
+
+  pi.on("thinking_level_select", (event) => {
+    if (managedRuntimeDepth > 0 || state.phase === "off") return;
+    state.cycle.planningThinking = event.level;
+    persist();
   });
 
   pi.on("before_agent_start", async (event, ctx) => {

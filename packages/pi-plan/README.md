@@ -34,6 +34,7 @@ Press **Ctrl+E** to edit a ready plan in the configured external editor.
 After **Keep planning**, send a message to request a complete plan replacement.
 
 Plan options include inherited settings, enabled models, and effort levels from `off` through `max`.
+Model and effort changes made while Plan mode is active override that cycle's settings.
 
 Add each plan model to the Pi `enabledModels` setting. Pi limits effort to the model capabilities.
 
