@@ -1,0 +1,37 @@
+{
+  "name": "@joknoll/pi-git-meta",
+  "version": "0.1.0",
+  "description": "Immutable Pi agent provenance traces stored by git-meta.",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "scripts"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "check": "vp check",
+    "test": "vp test run",
+    "prepublishOnly": "vp run build"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.mjs"
+    ]
+  }
+}
