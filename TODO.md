@@ -50,3 +50,4 @@ similar to https://entire.io/
 
 - herdr-board, herdr-kanban
 - heardr beads
+- Maybe a herdr board using ticgit for the ticket metadata?
