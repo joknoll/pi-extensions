@@ -1,7 +1,7 @@
 {
   "name": "@joknoll/pi-git-meta",
   "version": "0.1.0",
-  "description": "Immutable Pi agent provenance traces stored by git-meta.",
+  "description": "Immutable Pi agent provenance records stored with git-meta.",
   "keywords": [
     "coding-agent",
     "git",

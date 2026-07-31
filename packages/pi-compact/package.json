@@ -1,7 +1,7 @@
 {
   "name": "@joknoll/pi-compact",
   "version": "0.0.0",
-  "description": "Reviewed, editable native compaction checkpoints for Pi.",
+  "description": "Review and editing for Pi compaction checkpoints.",
   "keywords": [
     "coding-agent",
     "compaction",

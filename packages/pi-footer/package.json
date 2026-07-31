@@ -1,7 +1,7 @@
 {
   "name": "@joknoll/pi-footer",
   "version": "0.0.0",
-  "description": "A compact, Starship-aware footer for Pi.",
+  "description": "Compact footer with Starship support for Pi.",
   "keywords": [
     "coding-agent",
     "footer",

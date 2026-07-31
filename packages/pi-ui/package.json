@@ -1,7 +1,7 @@
 {
   "name": "@joknoll/pi-ui",
   "version": "0.0.0",
-  "description": "Personal UI customizations for Pi, excluding the footer.",
+  "description": "Custom Pi interface features, except the footer.",
   "keywords": [
     "coding-agent",
     "pi-extension",

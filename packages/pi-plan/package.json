@@ -1,7 +1,7 @@
 {
   "name": "@joknoll/pi-plan",
   "version": "0.0.0",
-  "description": "Keyboard-first strict Plan mode for Pi.",
+  "description": "Strict, keyboard-controlled plan mode for Pi.",
   "keywords": [
     "coding-agent",
     "pi-extension",

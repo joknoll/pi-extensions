@@ -1,7 +1,7 @@
 {
   "name": "@joknoll/pi-cache",
   "version": "0.0.0",
-  "description": "Session-only prompt-cache observability for Pi.",
+  "description": "Session prompt cache metrics for Pi.",
   "keywords": [
     "cache",
     "coding-agent",

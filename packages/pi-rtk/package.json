@@ -1,7 +1,7 @@
 {
   "name": "@joknoll/pi-rtk",
   "version": "0.0.0",
-  "description": "Thin Pi integration for RTK command rewriting.",
+  "description": "Pi integration for RTK command rewriting.",
   "keywords": [
     "coding-agent",
     "pi-extension",
