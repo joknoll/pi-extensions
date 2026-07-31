@@ -42,6 +42,8 @@ def main [] {
     $traces | select started branch commits prompt | input list --index "Select a Pi trace"
   )
   if $selected != null {
-    $traces | get $selected | get trace | table --expand --expand-deep 3
+    #$traces | get $selected | get trace | table --expand --expand-deep 3
+    # $traces | explore
+    $traces | get $selected | explore
   }
 }
