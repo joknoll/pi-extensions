@@ -1,18 +1,30 @@
 # @joknoll/pi-cache
 
-Session-only prompt-cache telemetry for Pi.
+Session prompt cache metrics for Pi.
 
-It observes normalized usage returned by Pi/provider responses and displays a
-footer status such as `cache 8/12 · 84%`. It never rewrites prompts, changes
-request payloads, changes cache retention, or edits model configuration.
+The extension reads normalized usage data from Pi provider responses. It shows a footer status such as `cache 8/12 · 84%`.
 
-`/cache-stats` shows the current session's token totals. `/cache-stats reset`
-starts a fresh in-process measurement. On reload, stats are rebuilt from the
-active session history; no separate stats file is written to disk.
+The extension does not change prompts, requests, cache retention, or model configuration.
 
-If a provider does not expose `cacheRead` or `cacheWrite`, it displays
-`cache n/a` rather than treating the response as a cache miss.
+## Commands
 
-The extension publishes its footer text through the `pi-cache` extension-status
-key. Pi's standard footer shows extension statuses; a custom footer can render
-it with `footerData.getExtensionStatuses().get("pi-cache")`.
+```text
+/cache-stats
+/cache-stats reset
+```
+
+`/cache-stats` shows token totals for the current session. `/cache-stats reset` starts a new in-process measurement.
+
+After a reload, the extension rebuilds metrics from the active session history. It does not write a separate metrics file.
+
+If a provider omits `cacheRead` or `cacheWrite`, the footer shows `cache n/a`.
+
+## Footer integration
+
+The extension publishes text under the `pi-cache` status key. The standard Pi footer shows this status.
+
+A custom footer can read the status:
+
+```ts
+footerData.getExtensionStatuses().get("pi-cache");
+```

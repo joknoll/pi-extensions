@@ -1,15 +1,32 @@
 # @joknoll/pi-ui
 
-Personal UI customizations for [Pi](https://pi.dev). Footer customization is deliberately kept separate in `@joknoll/pi-footer`.
+Custom interface features for [Pi](https://pi.dev). The separate `@joknoll/pi-footer` package provides footer changes.
 
-This extension replaces the stock input editor with a borderless, full-width surface using the theme's `userMessageBg` color. It preserves the stock editor's behavior, keybindings, autocomplete rendering, and distinct shell prompt.
+## Input editor
 
-It replaces the built-in `edit` renderer while delegating execution to Pi's native edit tool. Edit calls use a native, theme-aware diff with syntax highlighting, word-level emphasis, accurate line gutters, and an adaptive split/unified layout. The compact view shows 16 logical diff rows; expand the tool row to view the full change. Write calls use Pi's built-in renderer, with no external diff process.
+The extension replaces the standard input editor with a borderless, full-width editor.
+
+The editor uses the theme `userMessageBg` color. It keeps standard behavior, key bindings, autocomplete, and the shell prompt.
+
+## Edit display
+
+The extension replaces the standard `edit` display. Pi still runs its native edit tool.
+
+The display provides:
+
+- Theme-aware diffs
+- Syntax highlighting
+- Word-level emphasis
+- Accurate line gutters
+- Adaptive split and unified layouts
+
+The compact view shows 16 logical diff rows. Expand the tool row to show the full change.
+
+The extension uses the standard Pi display for `write` calls. It does not start an external diff process.
 
 ## Development
 
-```bash
-vp run --filter @joknoll/pi-ui test
-vp run --filter @joknoll/pi-ui check
-vp run --filter @joknoll/pi-ui build
+```sh
+vp test run
+vp pack
 ```

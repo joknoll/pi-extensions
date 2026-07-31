@@ -1,61 +1,84 @@
 # @joknoll/pi-plan
 
-Keyboard-first, strict Plan mode for Pi.
+Strict, keyboard-controlled plan mode for Pi.
 
 ## Install
 
-Install the package globally through Pi:
+Install the package through Pi:
 
 ```sh
 pi install npm:@joknoll/pi-plan
 ```
 
-For local development, build it and load the package directory temporarily:
+For local development, build and load the package directory:
 
 ```sh
 vp pack
 pi -e .
 ```
 
-The package manifest exposes `dist/index.mjs` through `pi.extensions`.
-
-Shift+Tab must be available to the extension. Move `app.thinking.cycle` to another key (for example Ctrl+Shift+P); Pi treats Shift+Tab as reserved and it must not remain assigned to thinking-level cycling.
+Assign `app.thinking.cycle` to a key other than Shift+Tab. The extension requires Shift+Tab.
 
 ## Workflow
 
-- Press **Shift+Tab** to enter Plan mode. Existing editor text is preserved and the footer shows `plan`.
-- Discuss the work while the model inspects the repository with read-only tools.
-- While idle, press **Shift+Tab** again for planning model/effort options or to exit.
-- The model submits a structured completion; the footer shows `plan ready` and an action menu appears.
-- Choose implementation with existing discussion, implementation with logically cleared conversation context, keep planning, or exit/discard.
-- While a plan is ready, press **Ctrl+E** in the menu or while idle to edit its archived Markdown file in Pi's configured external editor.
-- A following message after Keep planning uses the current plan as a revision baseline and requires a complete replacement.
+1. Press **Shift+Tab** to enter Plan mode.
+2. Discuss the work while the model uses read-only tools.
+3. Press **Shift+Tab** while idle to change options or exit.
+4. Wait for the model to submit a structured plan.
+5. Select an implementation, revision, or exit action.
 
-Planning options include inherited settings, models allowed by Pi's `enabledModels` setting, and efforts from `off` through `max`. Add each planning model as its model ID (or `provider/model` ID) in Pi's configuration. Pi may clamp effort to model capabilities. The entry model, effort, and exact available tool set are restored on implementation or exit.
+The footer shows `plan` during the cycle and `plan ready` after plan completion.
+
+Press **Ctrl+E** to edit a ready plan in the configured external editor.
+
+After **Keep planning**, send a message to request a complete plan replacement.
+
+Plan options include inherited settings, enabled models, and effort levels from `off` through `max`.
+
+Add each plan model to the Pi `enabledModels` setting. Pi limits effort to the model capabilities.
+
+The extension restores the original model, effort, and tools after implementation or exit.
 
 ## Clarification questions
 
-`plan_mode_question` asks one to three structured questions. Each question declares an explicit `type`:
+The `plan_mode_question` tool asks one to three questions. Each question uses `single_choice` or `multiple_choice`.
 
-- `single_choice` / `multiple_choice` — require 2 to 4 `{ label, impact }` options. A synthetic "Other" choice is always added; option labels may not collide with it (case-insensitively).
+Provide two to four `{ label, impact }` options for each question. The extension adds an `Other` option.
 
-Keyboard controls:
+Do not use an option label that matches `Other`, regardless of case.
 
-- **Single Choice**: ↑↓ choose, ←→ move between questions, Enter submit, Esc/Ctrl+C cancel.
-- **Multiple Choice**: ↑↓ move, Space toggle, Enter submit (at least one selection required), ←→ move between questions, Esc/Ctrl+C cancel.
+### Keyboard controls
 
-Choosing "Other" (Single/Multiple Choice) opens a text prompt; cancelling that prompt returns to the question instead of cancelling the batch, and deselecting/reselecting "Other" lets the value be changed. Navigating back to an already-answered question restores its prior answer.
+- Use ↑↓ to select an option.
+- Use ←→ to move between questions.
+- Use Space to toggle multiple choices.
+- Use Enter to submit.
+- Use Esc or Ctrl+C to cancel.
 
-Answers are returned in question order, one per question, as a typed union:
+A multiple-choice answer requires at least one selection.
+
+Select `Other` to open a text prompt. If you cancel that prompt, the extension returns to the current question.
+
+The extension restores prior answers when you return to a question.
+
+Answers use a typed union:
 
 ```json
 { "id": "...", "type": "single_choice", "label": "...", "other": "optional custom text" }
 { "id": "...", "type": "multiple_choice", "labels": ["...", "Other"], "other": "optional custom text" }
 ```
 
-Cancelling any question, submitting an empty custom answer, or a Plan-mode cycle change while a question is open returns `{ "cancelled": true, "answers": [] }` with no partial answers.
+A canceled question returns this result without partial answers:
 
-Global defaults live at `$PI_CODING_AGENT_DIR/pi-plan.json` (normally `~/.pi/agent/pi-plan.json`):
+```json
+{ "cancelled": true, "answers": [] }
+```
+
+An empty custom answer or a Plan mode cycle change returns the same result.
+
+## Defaults
+
+Store global defaults in `$PI_CODING_AGENT_DIR/pi-plan.json`:
 
 ```json
 {
@@ -64,34 +87,51 @@ Global defaults live at `$PI_CODING_AGENT_DIR/pi-plan.json` (normally `~/.pi/age
 }
 ```
 
-Invalid settings warn and fall back to inherited values without rewriting the file.
+The default directory is `~/.pi/agent`. Invalid values use inherited settings and produce a warning.
 
 ## Plans and safety
 
-Plans are archived under `$PI_CODING_AGENT_DIR/plans/`. Revisions overwrite the cycle's archive; new cycles create new files. Implementation and discard retain archives.
+The extension stores plans under `$PI_CODING_AGENT_DIR/plans/`. A revision replaces the current cycle file.
 
-Plan mode exposes only effective built-in inspection tools, a fail-closed restricted shell, structured questions, and structured completion. The structured Plan tools are visible to the model only while Plan mode is active; implementation, discard, off-state session restoration, and shutdown restore normal tools without them. It blocks writing tools, unknown/custom tools, shell expansion and redirection, mutating Git, installers, and unknown commands. RTK-wrapped commands receive the same read-only authorization checks as their effective commands. This is risk reduction, not an OS sandbox: allowed builds and checks can still run project hooks or create ignored artifacts.
+A new cycle creates a new file. Implementation and discard keep the archived file.
 
-The clear-context implementation action writes a unique durable boundary and filters earlier conversation from all subsequent model context, including later Plan-mode cycles. The visible session remains intact, and normal system/project instructions and tools remain available.
+Plan mode permits built-in inspection tools, a restricted shell, questions, and plan completion.
 
-The footer reports `plan` and `plan ready`. Ctrl+E is intercepted only while an archived plan is ready and Pi is idle; Pi's normal external prompt editor remains untouched at all other times. Invalid or failed archive edits restore the previous plan.
+It blocks write tools, unknown tools, shell expansion, redirection, Git changes, installers, and unknown commands.
+
+RTK commands receive the same checks as their effective commands.
+
+This control reduces risk but does not provide an operating system sandbox. Allowed builds and checks can run hooks or create ignored files.
+
+The clear-context action adds a durable boundary. Later model context excludes all conversation before that boundary.
+
+The visible session, system instructions, project instructions, and standard tools remain available.
+
+Ctrl+E changes only a ready archived plan while Pi is idle. Failed edits restore the prior plan.
 
 ## Herdr integration
 
-Install Herdr's Pi integration before launching Pi:
+Install the Herdr Pi integration before you start Pi:
 
 ```sh
 herdr integration install pi
 ```
 
-Pi must run inside a Herdr-managed pane with `HERDR_ENV=1`, `HERDR_PANE_ID`, and `HERDR_SOCKET_PATH` in its environment. The integration maps Pi's normal `agent_start` and `agent_end` lifecycle to Herdr `working → idle`; Herdr derives the blue `done` indicator when that idle pane is in the background and unseen. A focused completed pane remains seen/idle.
+Run Pi in a Herdr pane with `HERDR_ENV=1`, `HERDR_PANE_ID`, and `HERDR_SOCKET_PATH`.
 
-Successful `plan_mode_complete` calls terminate the agent turn, producing `agent_end`. While clarification dialogs and the Plan-ready action menu await input, Pi Plan emits `herdr:blocked`, which the installed integration maps to Herdr's red blocked indicator; closing or cancelling the interaction clears it. Planning options and the ordinary Plan-mode menu do not report blocked. Pi Plan contains no direct Herdr socket code or dependency: Herdr owns delivery retries, session identity, sequencing, and state arbitration. Without the integration, Plan mode still works normally, but Herdr's limited screen heuristic may not reliably show these states.
+Herdr maps `agent_start` and `agent_end` to its `working` and `idle` states.
+
+The extension emits `herdr:blocked` during question dialogs and the ready-plan action menu. It clears this state when the interaction ends.
+
+Plan options and the standard Plan mode menu do not emit the blocked state.
+
+The extension contains no Herdr socket code or dependency. Herdr controls delivery, identity, sequence, and state arbitration.
+
+Plan mode works without Herdr integration. The Herdr screen heuristic can then report less accurate states.
 
 ## Development
 
 ```sh
-vp check
 vp test run
 vp pack
 ```

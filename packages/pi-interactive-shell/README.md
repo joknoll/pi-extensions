@@ -1,16 +1,18 @@
 # @joknoll/pi-interactive-shell
 
-Pi extension providing shell-mode completion.
+Bash and Nushell command completion for Pi shell commands.
 
-- `!command` and `!!command` complete Bash command names.
-- `!nu <code>` and `!!nu <code>` run Nushell code and use Nu's `--ide-complete` API for completion.
-- `!!` preserves Pi's hidden-shell behavior: output is not sent to the model.
+- Use `!command` or `!!command` to complete Bash command names.
+- Use `!nu <code>` or `!!nu <code>` to run Nushell code with completion.
+- Use `!!` to keep command output hidden from the model.
 
-Nushell must be available as `nu` on `PATH`. Bash completion currently covers command names; Pi's normal path completion handles subsequent arguments.
+The extension uses the Nushell `--ide-complete` API. Install `nu` on `PATH` before you use Nushell completion.
+
+Bash completion supports command names. Pi handles path completion for later arguments.
 
 ## Development
 
 ```sh
-vp run --filter @joknoll/pi-interactive-shell check
-vp run --filter @joknoll/pi-interactive-shell build
+vp test run
+vp pack
 ```

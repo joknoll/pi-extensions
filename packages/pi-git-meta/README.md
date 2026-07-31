@@ -1,8 +1,16 @@
 # @joknoll/pi-git-meta
 
-Stores one complete Pi trace for each top-level agent run in `git-meta`. It never changes checked-out files or synchronizes metadata automatically.
+Immutable Pi agent provenance records stored with `git-meta`.
 
-Install `git-meta-cli` 0.1.10 or newer and configure Git author name/email. The extension runs only in trusted non-bare Git worktrees.
+The extension stores one complete trace for each top-level agent run. It does not change checked-out files or synchronize metadata.
+
+## Requirements
+
+- Install `git-meta-cli` 0.1.10 or later.
+- Configure the Git author name and email.
+- Use a trusted, non-bare Git worktree.
+
+## Configuration
 
 ```json
 {
@@ -14,9 +22,17 @@ Install `git-meta-cli` 0.1.10 or newer and configure Git author name/email. The 
 }
 ```
 
-Project settings override global settings. Traces include source, assistant thinking, tool results, images, and potentially secrets. Nothing is redacted.
+Project settings override global settings.
 
-Commits observed on the same branch and fast-forward path during a run are linked automatically. If exactly one trace is pending, the extension also links later same-branch commits when the next Pi session or run starts. This is correlation, not proof that Pi authored them. Ambiguous pending traces remain manual:
+Traces can contain source code, model thoughts, tool results, images, and secrets. The extension does not redact data.
+
+## Commit links
+
+The extension links commits from the same branch and fast-forward path during a run.
+
+If one trace is pending, the next Pi session links later commits from the same branch. This link shows correlation, not authorship.
+
+If multiple traces are pending, attach them manually:
 
 ```text
 /git-meta status
@@ -31,20 +47,29 @@ List pending trace IDs:
 git meta get project meta:local:pi:pending-traces
 ```
 
-List traces attached to a commit:
+List traces for a commit:
 
 ```sh
 git meta get commit:HEAD agent:traces
 ```
 
-Trace data is stored as small base64 chunks to avoid `git-meta 0.1.10`'s broken large-string offloading path.
+The extension stores trace data as small Base64 chunks. This format avoids the broken large-string path in `git-meta` 0.1.10.
 
-Traces created by the earlier single-value implementation remain affected by that git-meta bug; the browser can read traces created after this change.
+Earlier single-value traces remain subject to that defect. The browser can read traces that use the chunk format.
 
-Open the interactive trace browser from the package directory:
+Open the trace browser from this package directory:
 
 ```nu
 nu scripts/git-meta-traces.nu
 ```
 
-Use native `git meta serialize`, `git meta sync`, and `git meta setup` commands when needed. Serialization may include other dirty records from the local git-meta database.
+Use native `git meta serialize`, `git meta sync`, and `git meta setup` commands when required.
+
+Serialization can include other dirty records from the local `git-meta` database.
+
+## Development
+
+```sh
+vp test run
+vp pack
+```
