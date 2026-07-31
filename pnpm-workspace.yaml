@@ -8,6 +8,8 @@ catalog:
   "@earendil-works/pi-coding-agent": ^0.80.10
   "@earendil-works/pi-tui": ^0.80.10
   "@types/node": ^24
+  diff: ^8.0.4
+  ts-syntax-highlighter: ^0.2.5
   typescript: ^7.0.2
   vite: npm:@voidzero-dev/vite-plus-core@0.2.6
   vite-plus: 0.2.6
